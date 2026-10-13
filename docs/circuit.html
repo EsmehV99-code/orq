@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How the orchestrator skill works, in three diagrams</title>
+<style>
+:root{
+  --ink:#1a1d21;
+  --muted:#5a6169;
+  --paper:#f7f8fa;
+  --card:#ffffff;
+  --line:#9aa3ad;
+  --border:#d8dde3;
+
+  --green:#1f7a44;
+  --green-bg:#e8f6ed;
+  --green-border:#4ea675;
+
+  --red:#a62a2a;
+  --red-bg:#fdecec;
+  --red-border:#d2706f;
+
+  --gray:#4a5259;
+  --gray-bg:#eef0f3;
+  --gray-border:#b9c1ca;
+}
+*{box-sizing:border-box}
+html{ -webkit-text-size-adjust:100%; }
+body{
+  margin:0;
+  padding:32px 20px 72px;
+  background:var(--paper);
+  color:var(--ink);
+  font:17px/1.55 -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+}
+.wrapper{max-width:1180px;margin:0 auto}
+
+h1{font-size:30px;line-height:1.25;margin:0 0 10px}
+h2{font-size:24px;line-height:1.3;margin:0 0 6px}
+h3{font-size:19px;margin:34px 0 10px}
+p{margin:0 0 14px}
+.intro{font-size:18px;color:var(--muted);max-width:75ch;margin-bottom:6px}
+.notice{
+  border-left:5px solid var(--line);
+  background:var(--card);
+  padding:12px 16px;margin:20px 0 34px;
+  font-size:16px;color:var(--muted);
+}
+
+/* --- color legend --- */
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0 8px;padding:0;list-style:none}
+.legend li{
+  display:flex;align-items:center;gap:9px;
+  font-size:16px;background:var(--card);
+  border:1px solid var(--border);border-radius:8px;padding:8px 13px;
+}
+.swatch{width:19px;height:19px;border-radius:5px;border:2px solid}
+.m-green{background:var(--green-bg);border-color:var(--green-border)}
+.m-red{background:var(--red-bg);border-color:var(--red-border)}
+.m-gray{background:var(--gray-bg);border-color:var(--gray-border)}
+
+/* --- each diagram's block --- */
+.diagram{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:26px 24px 30px;
+  margin:0 0 18px;
+}
+.context-note{
+  font-size:17px;color:var(--muted);
+  margin:0 0 22px;padding-bottom:14px;
+  border-bottom:1px dashed var(--border);
+}
+
+/* --- boxes --- */
+.box{
+  width:218px;min-height:78px;
+  display:flex;flex-direction:column;justify-content:center;
+  border:2px solid var(--gray-border);
+  background:var(--gray-bg);
+  border-radius:11px;
+  padding:13px 15px;
+  text-align:center;
+}
+.box .title{font-size:17px;font-weight:700;line-height:1.3}
+.box .foot{font-size:16px;color:var(--muted);margin-top:5px;line-height:1.35}
+.box.green{background:var(--green-bg);border-color:var(--green-border)}
+.box.green .title{color:var(--green)}
+.box.red{background:var(--red-bg);border-color:var(--red-border)}
+.box.red .title{color:var(--red)}
+.box.gate{border-width:3px;border-style:double;border-radius:6px}
+
+/* --- arrows --- */
+.arrow-down{display:flex;flex-direction:column;align-items:center;margin:4px 0}
+.arrow-down .stem{width:3px;height:26px;background:var(--line)}
+.arrow-down .point{
+  width:0;height:0;
+  border-left:9px solid transparent;border-right:9px solid transparent;
+  border-top:13px solid var(--line);
+}
+.arrow-down .label{font-size:16px;color:var(--muted);margin-top:5px}
+.arrow-down.green .stem{background:var(--green-border)}
+.arrow-down.green .point{border-top-color:var(--green-border)}
+.arrow-down.green .label{color:var(--green)}
+.arrow-down.red .stem{background:var(--red-border)}
+.arrow-down.red .point{border-top-color:var(--red-border)}
+.arrow-down.red .label{color:var(--red)}
+
+.toward{display:flex;align-items:center;gap:9px;font-size:16px;color:var(--muted)}
+.toward .dash{flex:1 1 26px;min-width:26px;height:3px;background:var(--line);position:relative}
+.toward .dash::after{
+  content:"";position:absolute;right:-1px;top:-5px;
+  width:0;height:0;
+  border-top:6.5px solid transparent;border-bottom:6.5px solid transparent;
+  border-left:11px solid var(--line);
+}
+
+/* --- rows and branches --- */
+.row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px}
+.centered{display:flex;flex-direction:column;align-items:center}
+.branch{display:flex;flex-wrap:wrap;gap:34px;justify-content:center;align-items:flex-start}
+.arm{display:flex;flex-direction:column;align-items:center;gap:0}
+.tag{
+  font-size:16px;font-weight:700;color:var(--muted);
+  margin-bottom:9px;letter-spacing:.02em;text-transform:uppercase;
+}
+
+/* --- diagram 2: three columns --- */
+.locks{display:flex;flex-direction:column;gap:12px}
+.header-row,.lock{
+  display:grid;
+  grid-template-columns:1fr 250px 1fr;
+  gap:16px;align-items:center;
+}
+.header-row span{
+  font-size:16px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.02em;
+  padding-bottom:7px;border-bottom:2px solid var(--border);
+}
+.header-row .right{text-align:right}
+.lock .attempt{font-size:16px;color:var(--ink);display:flex;align-items:center;gap:10px}
+.lock .opens{font-size:16px;color:var(--ink);display:flex;align-items:center;gap:10px}
+.lock .box{width:100%;min-height:66px}
+.num{
+  flex:0 0 auto;
+  width:28px;height:28px;border-radius:50%;
+  background:var(--gray-bg);border:1px solid var(--border);
+  font-size:16px;font-weight:700;color:var(--muted);
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* --- diagram 3: two columns --- */
+.two-col{display:flex;flex-wrap:wrap;gap:40px;justify-content:center}
+.col{flex:1 1 380px;max-width:460px}
+.col .tag{text-align:center}
+
+/* --- tables --- */
+.table-wrap{overflow-x:auto;margin:6px 0 34px}
+table{border-collapse:collapse;width:100%;font-size:16px;background:var(--card)}
+caption{
+  text-align:left;font-size:17px;font-weight:700;
+  padding:0 0 9px;color:var(--ink);
+}
+th,td{border:1px solid var(--border);padding:10px 13px;text-align:left;vertical-align:top}
+th{background:var(--gray-bg);font-size:16px}
+td code, th code{
+  font-family:Consolas, "Courier New", monospace;
+  font-size:16px;background:var(--paper);
+  padding:1px 5px;border-radius:4px;border:1px solid var(--border);
+}
+tbody tr:nth-child(even){background:#fcfcfd}
+
+footer{
+  margin-top:40px;padding-top:18px;
+  border-top:1px solid var(--border);
+  font-size:16px;color:var(--muted);
+}
+
+@media (max-width:900px){
+  .header-row,.lock{grid-template-columns:1fr}
+  .header-row{display:none}
+  .lock{gap:8px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .lock .box{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<h1>How this skill works, in three diagrams</h1>
+<p class="intro">
+  This skill turns ONE terminal into the <strong>orchestrator</strong>. The orchestrator
+  <strong>doesn't build</strong>: it splits your request into pieces, hands them to others, and checks
+  what comes back before letting it in.
+</p>
+
+<ul class="legend">
+  <li><span class="swatch m-green"></span> Green: what moves forward</li>
+  <li><span class="swatch m-red"></span> Red: the lock that blocks</li>
+  <li><span class="swatch m-gray"></span> Gray: what waits or helps</li>
+</ul>
+
+<p class="notice">
+  Inside the diagrams there isn't a single command or path: just plain words.
+  The commands and files are in the table below each diagram.
+</p>
+
+
+<!-- ==================== DIAGRAM 1 ==================== -->
+<h2>Diagram 1 — How it dispatches the work</h2>
+<div class="diagram">
+  <p class="context-note">
+    You're looking at the whole journey: from when you ask for something to when the work goes in.
+  </p>
+
+  <div class="centered">
+    <div class="box"><span class="title">You ask for something</span></div>
+    <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+
+    <div class="box">
+      <span class="title">Splits into lanes</span>
+      <span class="foot">no files in common</span>
+    </div>
+    <div class="arrow-down"><span class="stem"></span><span class="point"></span><span class="label">one by one</span></div>
+
+    <div class="box gate red"><span class="title">Does it fit in one go?</span></div>
+  </div>
+
+  <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+
+  <div class="branch">
+    <div class="arm">
+      <span class="tag">It fits</span>
+      <div class="box green">
+        <span class="title">Normal lane</span>
+        <span class="foot">one agent does it all</span>
+      </div>
+      <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+      <div class="box">
+        <span class="title">A cheap helper</span>
+        <span class="foot">reads the long stuff and dies</span>
+      </div>
+    </div>
+
+    <div class="arm">
+      <span class="tag">It doesn't fit</span>
+      <div class="box green">
+        <span class="title">Large lane</span>
+        <span class="foot">a named terminal</span>
+      </div>
+      <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+      <div class="box">
+        <span class="title">That lead dispatches within it</span>
+        <span class="foot">and joins the pieces</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down"><span class="stem"></span><span class="point"></span><span class="label">both paths come back here</span></div>
+
+  <div class="centered">
+    <div class="box">
+      <span class="title">A receipt comes back</span>
+      <span class="foot">everything with its proof</span>
+    </div>
+    <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+    <div class="box">
+      <span class="title">A receipt never counts</span>
+      <span class="foot">as a brief</span>
+    </div>
+    <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+    <div class="box gate red"><span class="title">Does it hold up under testing?</span></div>
+  </div>
+
+  <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+
+  <div class="branch">
+    <div class="arm">
+      <span class="tag">Good</span>
+      <div class="box green"><span class="title">The work goes in</span></div>
+    </div>
+    <div class="arm">
+      <span class="tag">Fails</span>
+      <div class="box red">
+        <span class="title">Goes back to dispatch</span>
+        <span class="foot">and you're not asked</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap">
+<table>
+  <caption>Table 1 — each box, and its real command or file</caption>
+  <thead><tr><th>Diagram box</th><th>What it really does</th><th>Real command or file</th></tr></thead>
+  <tbody>
+    <tr><td>You ask for something</td><td>Starts everything. Loading the skill inside the repository already kicks off the watching</td><td><code>SKILL.md</code>; by hand, subcommand <code>start</code></td></tr>
+    <tr><td>Splits into lanes</td><td>A lane = one scope, one <strong>exclusive file list</strong>, its own folder, and resources with their own name</td><td><code>references/dispatch.md</code> (STEP 2), <code>references/brief-template.md</code></td></tr>
+    <tr><td>Does it fit in one go?</td><td>The <strong>lane's size</strong>. The orchestrator measures it, never the lead</td><td><code>references/dispatch.md</code>, "Lane size: who measures it, and what changes"</td></tr>
+    <tr><td>Normal lane</td><td>One lead agent does it start to finish</td><td><code>agents/lane-lead.md</code></td></tr>
+    <tr><td>Large lane</td><td>It goes to a named terminal, and its brief tells it to load the mini-orchestrator manual</td><td><code>references/dispatch.md</code> ("Lane size"), <code>references/mini-orchestrator.md</code></td></tr>
+    <tr><td>That lead dispatches within it</td><td>Splits by non-overlapping files, writes its plan <strong>before the first code change</strong>, launches in parallel, and joins the sub-receipts</td><td><code>references/mini-orchestrator.md</code>, "STEP A — Split before launching anything"</td></tr>
+    <tr><td>A cheap helper</td><td>Nobody expensive reads long logs: a one-shot reader opens them</td><td><code>agents/disposable-reader.md</code>, <code>references/dispatch.md</code> ("Disposable reader")</td></tr>
+    <tr><td>A receipt comes back</td><td>Seven fixed headings; everything claimed carries the command that proves it, right next to it</td><td><code>references/receipt-template.md</code></td></tr>
+    <tr><td>A receipt never counts as a brief</td><td><strong>Nothing</strong> written in the receipts folder is noted as a dispatched brief, whatever it is called (even if its name says "brief"). The ones called <code>T&lt;n&gt;…</code> also go to their own list of receipts (at most 10 per console command)</td><td><code>scripts/orchestrator-control.js</code>: <code>isDispatch</code> excludes the folder (<code>RE_RECEIPTS_FOLDER</code>, <code>.orchestrator/receipts/</code>); <code>RE_RECEIPT_PATH</code> (only <code>T&lt;n&gt;…</code>); cap of 10 (<code>RECEIPTS_WRITTEN_MAX</code> area)</td></tr>
+    <tr><td>Does it hold up under testing?</td><td>First the machine gate; then the orchestrator <strong>opens two proofs itself</strong>; then the second reviewer</td><td><code>references/receipt-template.md</code> ("The marker rule", and the sampling steps); subcommands <code>validate</code> and <code>review</code></td></tr>
+    <tr><td>The work goes in</td><td>The entry order set at dispatch time is <strong>provisional</strong>: it gets recalculated against what actually changed</td><td><code>SKILL.md</code> (law 5); subcommand <code>integrate</code></td></tr>
+    <tr><td>Goes back to dispatch</td><td>A lane that fails <strong>gets dispatched again</strong> — another brief or another lane — without asking you. The orchestrator only touches code if you order it to in chat</td><td><code>SKILL.md</code> ("The orchestrator does NOT edit code"); <code>orchestrator.config.json</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Who is who</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Who</th><th>What it does</th><th>Model</th><th>Where it's defined</th></tr></thead>
+  <tbody>
+    <tr><td><strong>The orchestrator</strong></td><td>Dispatches, checks, and decides. <strong>Never builds</strong></td><td>Fable</td><td><code>SKILL.md</code></td></tr>
+    <tr><td><strong>Lane lead</strong></td><td>Does its whole lane and returns ONE receipt. <strong>Does touch the code</strong></td><td>Opus</td><td><code>agents/lane-lead.md</code></td></tr>
+    <tr><td><strong>A lead's sub-agents</strong></td><td>The pieces of a large lane: the hard part to Opus, the standard part to Sonnet, the mechanical part to Haiku</td><td>Opus / Sonnet / Haiku</td><td><code>references/dispatch.md</code>, the table of who does what (command tiers)</td></tr>
+    <tr><td><strong>Disposable reader</strong></td><td>Opens the long stuff, summarizes it in at most 30 lines, and dies</td><td>Haiku</td><td><code>agents/disposable-reader.md</code></td></tr>
+    <tr><td><strong>Receipt verifier</strong></td><td>Checks a receipt's claims one by one</td><td>Sonnet</td><td><code>agents/receipt-verifier.md</code></td></tr>
+    <tr><td><strong>Codex Sol</strong></td><td>A second opinion from <strong>another provider</strong> before saving to history</td><td>gpt-5.6-sol</td><td><code>scripts/orchestrator-control.js</code>, subcommand <code>review</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+
+<!-- ==================== DIAGRAM 2 ==================== -->
+<h2>Diagram 2 — The locks</h2>
+<div class="diagram">
+  <p class="context-note">
+    You're looking at what does NOT get through, and what it takes to open each one.
+  </p>
+
+  <div class="locks">
+    <div class="header-row">
+      <span>What tries to get through</span>
+      <span style="text-align:center">Lock</span>
+      <span class="right">What opens it</span>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">1</span> A brief with a gap <span class="toward"><span class="dash"></span></span></div>
+      <div class="box red"><span class="title">Brief gate</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> You fix the field it names</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">2</span> The orchestrator edits code <span class="toward"><span class="dash"></span></span></div>
+      <div class="box red"><span class="title">Edit brake</span><span class="foot">the only one that blocks today</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> Only your order in chat: 30 minutes, one single file</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">3</span> A receipt with no proof <span class="toward"><span class="dash"></span></span></div>
+      <div class="box red"><span class="title">Receipt gate</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> Goes back to the lead, with nobody reading its prose</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">4</span> A large lane with no plan <span class="toward"><span class="dash"></span></span></div>
+      <div class="box red"><span class="title">Plan gate</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> The plan, written before the first code change</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">5</span> Temp files left with no owner <span class="toward"><span class="dash"></span></span></div>
+      <div class="box red"><span class="title">Trash gate</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> Whoever makes the mess cleans it: deletes them or declares them</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">6</span> Saving with no second opinion <span class="toward"><span class="dash"></span></span></div>
+      <div class="box red"><span class="title">Second-reviewer gate</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> Really reviewing it and getting it on record</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">7</span> Third pass on the same thing, or a lead compacted for the third time <span class="toward"><span class="dash"></span></span></div>
+      <div class="box"><span class="title">Third-time brake</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> The orchestrator decides: continue, escalate, or redo; or a new brief to that same terminal</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">8</span> A search that came back zero <span class="toward"><span class="dash"></span></span></div>
+      <div class="box"><span class="title">A zero is not a fact</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> You test with something that should show up</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">9</span> A wait with no time set <span class="toward"><span class="dash"></span></span></div>
+      <div class="box"><span class="title">Every wait carries a clock</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> You give it a deadline; the 5-minute pulse watches it</div>
+    </div>
+
+    <div class="lock">
+      <div class="attempt"><span class="num">10</span> The orchestrator reads a lot itself <span class="toward"><span class="dash"></span></span></div>
+      <div class="box"><span class="title">Own-reading cap</span></div>
+      <div class="opens"><span class="toward"><span class="dash"></span></span> A cheap helper reads it, and it reads its summary</div>
+    </div>
+  </div>
+</div>
+
+<p class="notice">
+  <strong>Why some are red and others gray:</strong> today <strong>only locks 1 through 6
+  block the way</strong>. 7 through 10 are written laws the AI follows, with an alert that
+  reminds it. Saying they all block would be promising a brake that doesn't exist.
+</p>
+
+<div class="table-wrap">
+<table>
+  <caption>Table 2 — each lock, and where it lives</caption>
+  <thead><tr><th>#</th><th>Lock</th><th>Blocks, or is it a rule the AI obeys?</th><th>Where it lives</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Brief gate</td><td><strong>Blocks</strong>: exits with an error and names the field and its fix</td><td>Subcommand <code>validate --brief</code>; <code>references/control-phase-1-and-2.md</code>, section "How to drive it by hand", row "You just wrote a brief"</td></tr>
+    <tr><td>2</td><td>Edit brake</td><td><strong>Blocks, and it's the only alert from the program itself that blocks anything today.</strong> Denies writing or editing code to the terminal that loaded the skill — <strong>not to a lane's lead, who does edit</strong></td><td>Gate <code>orchestrator_builds</code>; turned on in <code>orchestrator.config.json</code>; the key is the subcommand <code>allow-edit</code>, with your order</td></tr>
+    <tr><td>3</td><td>Receipt gate</td><td><strong>Blocks</strong>: the receipt goes back with nobody reading its prose. Typical failure: long prose before the proof command</td><td>Subcommand <code>validate --receipt</code>; <code>references/receipt-template.md</code> ("The marker rule")</td></tr>
+    <tr><td>4</td><td>Split-plan gate</td><td><strong>Blocks</strong>: a large lane that says "0 sub-agents" with no explanation, or with no plan written before the code, gets rejected</td><td>Subcommand <code>validate --receipt</code>; <code>references/mini-orchestrator.md</code> ("STEP A")</td></tr>
+    <tr><td>5</td><td>Ownerless-trash gate</td><td><strong>Blocks</strong>: new files the receipt doesn't name take it down</td><td>Subcommand <code>validate --receipt</code></td></tr>
+    <tr><td>6</td><td>Second-reviewer gate (optional)</td><td><strong>Blocks</strong>, if you use one: prevents saving to history if the change has no review on record. And <code>review --help</code> launches nothing: with an orchestration running it prints the options; without one, it says there is none</td><td>your own review gate, if you have one (lives outside this skill; orq works without it); <code>review --help</code> in <code>scripts/orchestrator-control.js</code> (the <code>review</code> subcommand)</td></tr>
+    <tr><td>7</td><td>Third-time brake</td><td><strong>Rule the AI obeys</strong>, plus an alert. It covers two things: <strong>the third round</strong> over the same piece (for example, of Codex), where the orchestrator stops and decides — there is no fourth without a decision —; and <strong>the third time a lead compacts</strong>, where it gets a new, complete brief, <strong>to that same terminal</strong>. Nobody closes terminals</td><td><code>SKILL.md</code> (law 4); gate <code>third_round</code> (in the <code>GATES</code> table of <code>scripts/orchestrator-control.js</code>); subcommand <code>decide</code>; <code>orchestrator.config.json</code> (<code>compactions_per_brief</code>); gate <code>lane_handoff</code></td></tr>
+    <tr><td>8</td><td>A zero is not a fact</td><td><strong>Rule the AI obeys</strong>, plus an alert. Zero results proves nothing until the same method finds something that does exist</td><td><code>SKILL.md</code> (law 3); gate <code>zero_unchecked</code>; subcommand <code>zero --control</code></td></tr>
+    <tr><td>9</td><td>Every wait carries a clock</td><td><strong>Rule the AI obeys</strong>, plus an alert from the 5-minute pulse</td><td><code>SKILL.md</code> (law 4); gate <code>wait_expired</code>; subcommand <code>wait --deadline</code></td></tr>
+    <tr><td>10</td><td>Own-reading cap</td><td><strong>Rule the AI obeys</strong>, plus an alert: it cannot block, because the reading is already done by the time the program sees it. If the orchestrator itself reads <strong>400 lines or more</strong> in one turn, it is warned once: the long stuff gets opened by a disposable reader</td><td>Gate <code>own_reading</code> (<code>scripts/orchestrator-control.js</code>, <code>checkOwnReading</code>); threshold <code>own_reading_lines</code> in <code>orchestrator.config.json</code> (400; the default is <code>OWN_READING_LINES</code> in the script)</td></tr>
+  </tbody>
+</table>
+</div>
+
+
+<!-- ==================== DIAGRAM 3 ==================== -->
+<h2>Diagram 3 — What happens on its own, with nobody asking</h2>
+<div class="diagram">
+  <p class="context-note">
+    You're looking at two clocks running at the same time, never touching each other: a lead's, and the orchestrator's.
+  </p>
+
+  <div class="two-col">
+    <div class="col">
+      <div class="tag">While a lead is working</div>
+      <div class="centered">
+        <div class="box">
+          <span class="title">Memory halfway full</span>
+          <span class="foot">writes its note</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box">
+          <span class="title">Memory almost full</span>
+          <span class="foot">compacts itself</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box green">
+          <span class="title">Stays the SAME terminal</span>
+          <span class="foot">and rereads its note</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box green">
+          <span class="title">When it finishes</span>
+          <span class="foot">cleans up its own mess</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="tag">While the orchestrator is working</div>
+      <div class="centered">
+        <div class="box">
+          <span class="title">Every 5 minutes it looks at</span>
+          <span class="foot">waits, deliveries, and overlaps</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box">
+          <span class="title">And it hunts orphan processes:</span>
+          <span class="foot">it only warns</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box">
+          <span class="title">If it compacts itself</span>
+          <span class="foot">its note reaches it</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box">
+          <span class="title">The note lists</span>
+          <span class="foot">the new receipts</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box">
+          <span class="title">Almost every alert</span>
+          <span class="foot">is for the AI</span>
+        </div>
+        <div class="arrow-down"><span class="stem"></span><span class="point"></span></div>
+        <div class="box green">
+          <span class="title">When a lane closes</span>
+          <span class="foot">old notes get cleaned up</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap">
+<table>
+  <caption>Table 3 — what number it is, and where it comes from</caption>
+  <thead><tr><th>What happens on its own</th><th>The exact detail</th><th>Where it lives</th></tr></thead>
+  <tbody>
+    <tr><td>Memory halfway full</td><td>At <strong>500,000</strong> tokens it warns that same terminal: "write your note now"</td><td><code>orchestrator.config.json</code> (<code>warn_tokens</code>); gate <code>own_load</code></td></tr>
+    <tr><td>Memory almost full</td><td>At <strong>600,000</strong> it compacts itself. The whole window is <strong>1,000,000</strong>, i.e. 100%</td><td><code>orchestrator.config.json</code> (<code>airbag_tokens</code>); <code>autoCompactWindow</code> in <code>settings.json</code></td></tr>
+    <tr><td>Stays the same terminal</td><td>When it comes back from compacting, the first thing it gets is its own note. <strong>Nobody closes or relaunches terminals</strong></td><td><code>.orchestrator/handovers/</code> at the repo root; gate <code>lane_handoff</code></td></tr>
+    <tr><td>On the third time</td><td>A new, complete brief, to that same terminal</td><td><code>orchestrator.config.json</code> (<code>compactions_per_brief</code>)</td></tr>
+    <tr><td>When it finishes, cleans up its own mess</td><td>The receipt has to say "Temporaries deleted: yes" with the list. A "no" gets sent back</td><td><code>references/receipt-template.md</code></td></tr>
+    <tr><td>Every 5 minutes</td><td>A watcher calls the pulse. <strong>Stays quiet if nothing changed</strong>, so as not to wake anyone up for nothing</td><td>Subcommand <code>pulse</code>; <code>SKILL.md</code></td></tr>
+    <tr><td>And it hunts orphan processes</td><td>On every pulse it looks for watcher programs that have been alive for <strong>more than 5 minutes</strong> without their terminal. It warns <strong>once</strong> per process and <strong>never kills</strong>: it leaves you the command so you decide. <strong>NOT TESTED ON macOS</strong></td><td><code>scripts/orchestrator-control.js</code>: <code>orphanHookProcesses</code> and <code>warnOrphans</code> (inside <code>pulse</code>); <code>L.orphans_warned</code>; "I have killed nothing" in the same function</td></tr>
+    <tr><td>If the orchestrator compacts itself</td><td>Its handoff sheet, written from the ledger, gets put in front of it</td><td>Subcommand <code>handoff</code>; <code>orchestrator-handoff.md</code> next to the ledger</td></tr>
+    <tr><td>The note lists the new receipts</td><td>Its handoff sheet carries "Receipts since your handover": the lane receipts written <strong>after</strong> its note, so it does not wait for something already on disk</td><td><code>scripts/orchestrator-control.js</code>: <code>L.receipts_written</code> in the handoff sheet; <code>noteReceipt</code> (where they get noted)</td></tr>
+    <tr><td>Almost every alert is for the AI</td><td>Only <strong>four</strong> things reach <strong>your screen</strong>: that the folder isn't a repository, that the airbag is out of sync, that the orchestration started, and the brake when it denies something</td><td><code>references/control-phase-1-and-2.md</code>, section "What the owner sees on screen, and what only the AI sees"</td></tr>
+    <tr><td>When a lane closes</td><td>When its receipt passes the gate, its old notes get deleted <strong>except the last one</strong>: its terminal is still alive</td><td><code>references/control-phase-1-and-2.md</code>, section "What the hook cleans up, and when"</td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer>
+  Page written by hand: pure HTML and CSS, a single file, no libraries, no connection, and no
+  JavaScript. The same three diagrams are also in <code>docs/CIRCUIT.md</code>, as text.
+</footer>
+
+</div>
+</body>
+</html>

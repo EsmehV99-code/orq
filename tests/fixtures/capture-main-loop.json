@@ -1,0 +1,26 @@
+{
+  "session_id": "2f8d6c13-a4e9-4b7f-8c3d-5e1a9b0f7d26",
+  "transcript_path": "/Users/you/.claude/projects/-Users-you-dev-work-client-repo-0-projects-client-app/2f8d6c13-a4e9-4b7f-8c3d-5e1a9b0f7d26.jsonl",
+  "cwd": "/Users/you/dev/work/client-repo/projects/client-app",
+  "scratchpad_dir": "<text:149>",
+  "prompt_id": "<text:36>",
+  "permission_mode": "auto",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "<text:365>",
+    "description": "<text:38>"
+  },
+  "tool_response": {
+    "stdout": "<text:88>",
+    "stderr": "<text:0>",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+  },
+  "tool_use_id": "toolu_01Xq7Lm3Nb8Vt2Rc5Kd9Wf4H",
+  "duration_ms": 5362
+}

@@ -1,0 +1,34 @@
+{
+  "session_id": "b7e3a920-4c1f-4d8b-9e2a-61f0c8d4b5a2",
+  "transcript_path": "/Users/you/.claude/projects/-Users-you/b7e3a920-4c1f-4d8b-9e2a-61f0c8d4b5a2.jsonl",
+  "cwd": "/Users/you/.claude/skills/multi-terminal-orchestrator",
+  "scratchpad_dir": "<text:103>",
+  "prompt_id": "<text:36>",
+  "permission_mode": "auto",
+  "agent_id": "a5e81c6f0d2b3974e",
+  "agent_type": "",
+  "effort": {
+    "level": "high"
+  },
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_transcript_path": "/Users/you/.claude/projects/-Users-you/b7e3a920-4c1f-4d8b-9e2a-61f0c8d4b5a2/subagents/agent-a5e81c6f0d2b3974e.jsonl",
+  "last_assistant_message": "<text:51>",
+  "background_tasks": [
+    {
+      "id": "a2c7f4e91b0d6835a",
+      "type": "subagent",
+      "status": "running",
+      "description": "<text:39>",
+      "agent_type": "general-purpose"
+    },
+    {
+      "id": "bxtj0gbef",
+      "type": "shell",
+      "status": "running",
+      "description": "<text:90>",
+      "command": "<text:177>"
+    }
+  ],
+  "session_crons": []
+}

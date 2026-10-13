@@ -1,0 +1,135 @@
+{
+  "//": "REFERENCE ONLY — the normal way is `/orq-install` (scripts/install.js), which adds exactly these 12 hooks to your settings.json and `--check` says whether they are all there. If you prefer to do it by hand, MERGE these entries into the 'hooks' object of ~/.claude/settings.json (do not replace it). Every command runs the skill's own script, scripts/orchestrator-control.js — there is no separate copy of it any more (removed on 2026-09-22). The list is the same as PLUGS in scripts/install.js; tests/test-structure.mjs checks that both agree. After editing, validate the JSON: node -e \"JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.claude/settings.json','utf8'))\". NOT TESTED ON macOS: the `$HOME` expansion relies on the hook command running in a POSIX shell, which is what Claude Code does on macOS.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Skill|Agent|Task|TaskCreate|TaskUpdate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/skills/orq/scripts/orchestrator-control.js\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

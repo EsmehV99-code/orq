@@ -1,0 +1,20 @@
+{
+  "_THIS_IS_SYNTHETIC": "This is NOT a real capture. The ONLY thing ever actually seen (the orchestrator, 2026-09-21, in her own session) is the TEXT of the response of an asynchronous `Agent`: it starts with «Async agent launched successfully.» and carries an «agentId: <id> (internal ID - …)» line. Everything else in this payload —the hook envelope, the `tool_use_id`, the shape of `tool_response`— is DEDUCED. It does not prove the synchronous format or the real temporal order. Validating it needs `ORCH_CAPTURE` in an owner's terminal.",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Agent",
+  "tool_use_id": "toolu_SYNTHETIC_pre_0001",
+  "session_id": "synthetic-owner-session",
+  "transcript_path": "C:/Users/you/.claude/projects/synthetic/parent.jsonl",
+  "cwd": "C:/Users/you/dev/synthetic-repo",
+  "tool_input": {
+    "description": "synthetic lane T57",
+    "subagent_type": "lane-lead",
+    "prompt": "You are the lead of lane T57. Your full brief is in C:/Users/you/dev/synthetic-repo/BRIEF-T57.md — open it whole before anything else."
+  },
+  "tool_response": [
+    {
+      "type": "text",
+      "text": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)\nagentId: a1a9c2f331fb7a518 (internal ID - do not mention to user.)"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "_comment": [
+    "CODE -> SPEC MAP of this skill. A PERSON writes it, not a generator.",
+    "A spec is an exact FILE, never a folder or a glob (the hook compares by path equality).",
+    "It goes by FILE/SUBSYSTEM, not wide: a rule with several specs requires ALL of them, so",
+    "'scripts/** -> three docs' would force touching the three for a fix in dashboard.js.",
+    "Synchronisation between documents is watched by tests/test-structure.mjs, not by this map.",
+    "Keys starting with _ are ignored: this is a comment, not a rule.",
+    "Format and criteria: references/recon.md, step 1.8."
+  ],
+  "rules": [
+    { "code": ["scripts/orchestrator-control.js"], "spec": "references/control-phase-1-and-2.md" },
+    { "code": ["scripts/dashboard.js", "commands/dashboard.md"], "spec": "docs/DASHBOARD.md" },
+    { "code": ["agents/**"], "spec": "SKILL.md" }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "warn_tokens": 500000,
+  "airbag_tokens": 600000,
+  "compactions_per_brief": 3,
+  "own_reading_lines": 400,
+  "console_output_chars_note": "How many CHARACTERS of console output (Bash/PowerShell) a terminal may receive in one turn before the `own_reading` gate warns it (T42, 2026-09-24). 8000 = about 3600 tokens at 2.2 characters per token, the conversion MEASURED in T40 (calibrated table, source repo); T40 measured that the console is 21-33 % of what the orchestrator grows until its first lane, and with 8000, 13 of 186 turns and 21 of 340 warn (T42 measurement, source repo). Integer greater than 0; missing, 0, negative, decimal or text: 8000.",
+  "console_output_chars": 8000,
+  "injected_handover_kb_note": "How many KB of the handover are put in front of the terminal when it comes back from compacting (T18, 2026-09-22: from 12 to 16). Integer from 4 to 64; outside that, or no key, 16. Past the cap it is trimmed by sections and the last line says what is missing.",
+  "injected_handover_kb": 16,
+  "brakes": {
+    "orchestrator_builds": "block"
+  },
+  "integration_branches_note": "The branches NOBODY pushes to from a lane, not even with a git permit (gate `git_permit`, T5). If this key is missing, main, master and develop are used.",
+  "integration_branches": ["main", "master", "develop"],
+  "suites_note": "Extractors of the `repeated_red` gate (T7, 2026-09-21). JSON allows no comments: the long explanation is in references/control-phase-1-and-2.md. Per entry: `name` (what the suite is called in the warnings), `command` (regex over the command that LAUNCHES it), `failure` (regex per line; group 1 is the IDENTIFIER of the failed test), `summary` (regex of the closing line with TWO groups: how many passed and how many failed; it is the best guarantee there is, because it lets the extracted failures be RECONCILED against what the suite says, and catches a truncated output or a run of zero tests), `end` (poorer alternative when the runner gives no numbers: it only says that the run FINISHED), `output_command` (regex of a command that SHOWS the output file; it is the only way the gate sees a suite launched in the background) and `active: false` to leave it declared and OFF. With no matching entry, the gate gives NO opinion.",
+  "suites": [
+    {
+      "name": "structure",
+      "command": "node\\s+\\S*tests[\\\\/]test-structure\\.mjs",
+      "output_command": "(?:cat|tail|head|type|Get-Content|more)\\b[^\\n]*[\\w-]*structure[\\w-]*\\.out",
+      "failure": "^\\s{2}FAIL\\s+(.+?)(?:\\s{2}<-.*)?$",
+      "summary": "^STRUCTURE: (\\d+) OK, (\\d+) FAILS\\s*$"
+    },
+    {
+      "name": "hook",
+      "command": "node\\s+\\S*tests[\\\\/]test-orchestrator-control\\.mjs",
+      "output_command": "(?:cat|tail|head|type|Get-Content|more)\\b[^\\n]*[\\w-]*hook[\\w-]*\\.out",
+      "failure": "^\\s{2}FAIL\\s+(.+?)(?:\\s{2}<-.*)?$",
+      "summary": "^RESULT: (\\d+) OK, (\\d+) FAILS\\s*$"
+    },
+    {
+      "name": "adversarial",
+      "_no_summary": "Its closing line gives NO numbers (`ADVERSARIAL: no case broke the contract`), so this suite keeps the POOR guarantee: `end`. Declared consequence: if its output arrived truncated the gate detects it by the truncation, but it cannot RECONCILE extracted failures against reported failures as the other three do.",
+      "command": "node\\s+\\S*tests[\\\\/]test-orchestrator-control-adversarial\\.mjs",
+      "output_command": "(?:cat|tail|head|type|Get-Content|more)\\b[^\\n]*[\\w-]*adv[\\w-]*\\.out",
+      "failure": "^\\s{2}FAIL\\s+(.+?)(?:\\s+exit=.*)?$",
+      "end": "^ADVERSARIAL: (?:no case broke the contract|\\d+ CASE\\(S\\) BREAK THE CONTRACT)\\s*$"
+    },
+    {
+      "name": "dashboard",
+      "command": "node\\s+\\S*tests[\\\\/]test-dashboard\\.mjs",
+      "output_command": "(?:cat|tail|head|type|Get-Content|more)\\b[^\\n]*[\\w-]*dashboard[\\w-]*\\.out",
+      "failure": "^\\s{2}FAIL\\s+(.+?)(?:\\s{2}<-.*)?$",
+      "summary": "^DASHBOARD: (\\d+) OK, (\\d+) FAILS\\s*$"
+    },
+    {
+      "name": "generic-node-test",
+      "active": false,
+      "_why_off": "It is the trap this gate exists NOT to repeat. A bare `/FAIL|Error/` matches `0 failed`, an `Error` inside a quoted log and even the comment that explains the problem, which is the same failure already paid for in `zero_unchecked`. It is written here so that whoever has a project with node --test / jest / vitest / pytest copies it, ADJUSTS it to their runner and turns it on with `active: true` knowingly. While `active` is false, the gate does not even look at it. The suite DOES turn it on in a temporary config to check that the anchored extractor tells real failures from the fixture's decoys.",
+      "command": "node\\s+--test\\b|\\b(?:jest|vitest|pytest)\\b",
+      "failure": "^(?:not ok \\d+ - |FAIL |✗ )(.+?)\\s*$",
+      "summary": "^# pass (\\d+)\\n(?:[\\s\\S]*?)^# fail (\\d+)\\s*$"
+    }
+  ],
+  "conditional_angles": [
+    {
+      "name": "concurrency",
+      "when": "the diff touches parallel processes, locks, shared files, retries or global state",
+      "question": "what happens if two runs come in at the same time? is there a race between reading and writing?"
+    },
+    {
+      "name": "performance",
+      "when": "the diff adds loops over growing data, disk reads, or chained calls",
+      "question": "how much does this cost when the input is a hundred times larger?"
+    },
+    {
+      "name": "accessibility",
+      "when": "the diff touches an interface a person uses (markup, components, on-screen text)",
+      "question": "can it be used with a keyboard and a screen reader? is there an accessible name and contrast?"
+    },
+    {
+      "name": "i18n",
+      "when": "the diff touches visible text, dates, numbers, or string comparison and sorting",
+      "question": "does it break with accents, with another locale, or with much longer text?"
+    },
+    {
+      "name": "migrations",
+      "when": "the diff touches the data schema, the format of a state file, or the version of a ledger",
+      "question": "what happens to the data that ALREADY exists: integrity, compatibility and recovery? (reversibility, only if the contract asks for it)"
+    },
+    {
+      "name": "false positives and false negatives",
+      "when": "the diff adds or touches a check, a gate, a validator or a hook",
+      "question": "which legitimate input does it block too much, and which bad input does it let through?"
+    }
+  ]
+}

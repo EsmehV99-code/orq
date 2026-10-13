@@ -1,0 +1,131 @@
+{
+  "_comment": "Toy ledger for the EDGES, all the ones Codex gpt-5.6-sol catches in round 5: midnight, the exact 30-minute limit, a lane closed with no receipt, an agent with no launch time, an IMPOSTOR session marked owner, and a key with HTML inside. The suite runs it with the snapshot time PINNED (ORCH_DASHBOARD_NOW), so it does not matter what time of day it is run.",
+  "version": 1,
+  "program_id": "orch-edges01",
+  "mode": "OBSERVE",
+  "created_at": "@@40H_AGO@@",
+  "started_at": "@@40H_AGO@@",
+  "last_event_at": "@@2M_AGO@@",
+
+  "_identity": "owner_session rules: the impostor is more recent and has more memory, and must NOT show up in the orchestrator's box.",
+  "owner_session": "sreal111-2222-3333-4444-555555555555",
+  "sessions": {
+    "sreal111-2222-3333-4444-555555555555": {
+      "role": "owner",
+      "context_tokens": 300000,
+      "context_at": "@@2M_AGO@@",
+      "last_time": "@@2M_AGO@@",
+      "compactions": 2,
+      "cwd": "/tmp/toy/edges"
+    },
+    "simpost1-9999-8888-7777-666666666666": {
+      "role": "owner",
+      "context_tokens": 900000,
+      "context_at": "@@NOW@@",
+      "last_time": "@@NOW@@",
+      "compactions": 9,
+      "cwd": "/tmp/toy/other"
+    }
+  },
+
+  "agents": {
+    "t20aaaa": {
+      "_case": "MIDNIGHT: launched at 23:55 yesterday, snapshot at 00:05 today -> 10 min ago.",
+      "id": "t20aaaa",
+      "desc": "T20 the one that crosses midnight",
+      "type": "general-purpose",
+      "model": "opus",
+      "ctx": 100000,
+      "compactions": 0,
+      "mtime": "@@MS_10M_AGO@@"
+    },
+    "t21bbbb": {
+      "_case": "NO LAUNCH TIME: it has no brief, no artifact, no wait. Only its transcript.",
+      "id": "t21bbbb",
+      "desc": "T21 the one nobody wrote down when it launched",
+      "type": "general-purpose",
+      "model": "sonnet",
+      "ctx": 50000,
+      "compactions": 0,
+      "mtime": "@@MS_10M_AGO@@"
+    },
+    "t22cccc": {
+      "_case": "EXACT LIMIT: it moved exactly 30 minutes ago. That is already STALLED, not alive.",
+      "id": "t22cccc",
+      "desc": "T22 the one on the exact limit",
+      "type": "general-purpose",
+      "model": "sonnet",
+      "ctx": 40000,
+      "compactions": 0,
+      "mtime": "@@MS_30M_EXACT@@"
+    },
+    "t23dddd": {
+      "_case": "CLOSED WITH NO RECEIPT: terminal status, but nobody delivered a receipt.",
+      "id": "t23dddd",
+      "desc": "T23 the one that closed with no receipt",
+      "type": "general-purpose",
+      "model": "sonnet",
+      "ctx": 60000,
+      "compactions": 0,
+      "mtime": "@@MS_5M_AGO@@"
+    },
+    "t24eeee": {
+      "_case": "DELIVERED TODAY: a receipt from 2 minutes ago, the same calendar day as the snapshot.",
+      "id": "t24eeee",
+      "desc": "T24 the one that delivered with a receipt",
+      "type": "general-purpose",
+      "model": "opus",
+      "ctx": 70000,
+      "compactions": 0,
+      "mtime": "@@MS_2M_AGO@@"
+    }
+  },
+
+  "terminals": {
+    "<img src=x onerror=1>": {
+      "_case": "The key comes from the ledger and ends up in the summary line: it has to come out as TEXT, never as live HTML.",
+      "name": "poisoned named terminal",
+      "at": "@@2M_AGO@@",
+      "session": null
+    }
+  },
+
+  "dispatches": [
+    { "path": "/tmp/toy/splits/BRIEF-T20-crosses-the-midnight.md", "at": "@@10M_AGO@@" }
+  ],
+
+  "receipts": {
+    "T24": {
+      "at": "@@2M_AGO@@",
+      "status": "READY",
+      "next_step": "integrate",
+      "receipt": "/tmp/toy/splits/RECEIPT-T24.md"
+    }
+  },
+
+  "artifacts": {
+    "t23 the one that closed with no receipt": {
+      "rounds": 1,
+      "status": "CLOSED",
+      "decision": "stays",
+      "first": "@@40H_AGO@@",
+      "last_update": "@@5M_AGO@@"
+    }
+  },
+
+  "waits": [
+    {
+      "id": "w-edges01",
+      "what": "a wait closed TODAY, so the closed counter does not always come out 0",
+      "deadline": "@@2M_AGO@@",
+      "status": "CLOSED",
+      "created_at": "@@10M_AGO@@",
+      "closed_at": "@@2M_AGO@@",
+      "data": { "type": "subagent" }
+    }
+  ],
+
+  "alerts": [],
+  "counters": { "invocations": 5, "alerts": 0, "by_gate": { "receipt_missing": 1 } },
+  "gates": { "receipt_missing": "OBSERVE" }
+}

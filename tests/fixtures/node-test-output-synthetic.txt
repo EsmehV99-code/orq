@@ -1,0 +1,96 @@
+# REAL FIXTURE — NOT written by hand (T7, 2026-09-22).
+# LITERAL output of: node --test seeded.test.mjs   (Node v22.22.3, TAP 13 format) on a
+# file of 6 tests with TWO failures seeded on purpose (not ok 3 and not ok 4) and TWO
+# decoys: a "0 failed, 3 passed" line and a log that contains the word Error. It exists
+# to prove that the disabled generic extractor does NOT count decoys as failures.
+TAP version 13
+# summary of the old runner: 0 failed, 3 passed
+# [info] Error: string quoted inside a log
+# Subtest: sum of two positives
+ok 1 - sum of two positives
+  ---
+  duration_ms: 0.5669
+  type: 'test'
+  ...
+# Subtest: signed subtraction
+ok 2 - signed subtraction
+  ---
+  duration_ms: 0.0914
+  type: 'test'
+  ...
+# Subtest: parsing of the height 500000
+not ok 3 - parsing of the height 500000
+  ---
+  duration_ms: 0.9643
+  type: 'test'
+  location: 'C:\\Users\\you\\AppData\\Local\\Temp\\claude\\C--Users-you\\9c4e2b10-7f3d-4a1e-8b6c-2d5f0e7a9c31\\scratchpad\\seeded.test.mjs:5:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    500000 !== 500001
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 500001
+  actual: 500000
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/you/AppData/Local/Temp/claude/C--Users-you/9c4e2b10-7f3d-4a1e-8b6c-2d5f0e7a9c31/scratchpad/seeded.test.mjs:5:51)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: the ledger is called orchestrator-state.json
+not ok 4 - the ledger is called orchestrator-state.json
+  ---
+  duration_ms: 0.3001
+  type: 'test'
+  location: 'C:\\Users\\you\\AppData\\Local\\Temp\\claude\\C--Users-you\\9c4e2b10-7f3d-4a1e-8b6c-2d5f0e7a9c31\\scratchpad\\seeded.test.mjs:6:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'orchestrator-state.json'
+    - 'orch-state.json'
+          ^
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'orch-state.json'
+  actual: 'orchestrator-state.json'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/you/AppData/Local/Temp/claude/C--Users-you/9c4e2b10-7f3d-4a1e-8b6c-2d5f0e7a9c31/scratchpad/seeded.test.mjs:6:68)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: 0 failed is not a failure
+ok 5 - 0 failed is not a failure
+  ---
+  duration_ms: 0.5041
+  type: 'test'
+  ...
+# Subtest: a log with Error inside is not a failure
+ok 6 - a log with Error inside is not a failure
+  ---
+  duration_ms: 0.1213
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 4
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 98.8741

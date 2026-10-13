@@ -1,0 +1,15 @@
+{
+  "_THIS_IS_SYNTHETIC": "This is NOT a real capture. The `PreToolUse`/`Agent` payload has never been captured with ORCH_CAPTURE in an owner's terminal. This shape is DEDUCED from the payloads that were captured (`capture-subagentstop.json`, `pretooluse-subagent-synthetic.json`) and from the hooks schema. What it does NOT prove: that `tool_use_id` really comes in this event, nor the real temporal order Pre/write/Post. Validating it needs `ORCH_CAPTURE` in an owner's terminal launching an `Agent`.",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_use_id": "toolu_SYNTHETIC_pre_0001",
+  "session_id": "synthetic-owner-session",
+  "transcript_path": "C:/Users/you/.claude/projects/synthetic/parent.jsonl",
+  "cwd": "C:/Users/you/dev/synthetic-repo",
+  "tool_input": {
+    "description": "synthetic lane T57",
+    "subagent_type": "lane-lead",
+    "model": "sonnet",
+    "prompt": "You are the lead of lane T57. Your full brief is in C:/Users/you/dev/synthetic-repo/BRIEF-T57.md — open it whole before anything else."
+  }
+}

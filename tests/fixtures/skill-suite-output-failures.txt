@@ -1,0 +1,306 @@
+# REAL FIXTURE — NOT written by hand (T7, 2026-09-22).
+# LITERAL output of: ORCH_HOOK=<copy>/scripts/orchestrator-control.js node tests/test-structure.mjs
+# The copy is this same tree with THREE files seeded the way a clone with
+# core.symlinks=false leaves them: agents/lane-lead.md, agents/disposable-reader.md and
+# commands/dashboard.md replaced by a "gitdir: …" line with CRLF. It is the EXACT symptom
+# of the worktree that cost half an hour on 21-09: 11 of the 15 FAILs here
+# belong to the TREE, not to a code change. The other four are from T7 itself, in progress.
+# Regenerate it: see tests/test-orchestrator-control.mjs, section T7.
+
+A. THE PIECES ARE WHERE THEY SAY THEY ARE
+  OK    SKILL.md
+  OK    scripts/orchestrator-control.js
+  OK    tests/test-orchestrator-control.mjs
+  OK    tests/test-orchestrator-control-adversarial.mjs
+  OK    tests/test-structure.mjs
+  OK    references/control-phase-1-and-2.md
+  OK    references/brief-template.md
+  OK    references/receipt-template.md
+
+B. NO PATHS FROM BEFORE THE MOVE ARE LEFT
+  OK    SKILL.md does not cite the old path
+  OK    scripts/orchestrator-control.js does not cite the old path
+  OK    tests/test-orchestrator-control.mjs does not cite the old path
+  OK    tests/test-orchestrator-control-adversarial.mjs does not cite the old path
+  OK    tests/test-structure.mjs does not cite the old path
+  OK    references/control-phase-1-and-2.md does not cite the old path
+  OK    references/brief-template.md does not cite the old path
+  OK    references/receipt-template.md does not cite the old path
+  OK    settings.json does not cite the old path
+
+C. SETTINGS.JSON POINTS AT FILES THAT EXIST
+  OK    settings.json is valid JSON
+  OK    the hook is attached in 10 places (there are 10)
+  OK    the hook is in PreToolUse with a Bash matcher (the per-command brake arrives in time)
+  OK    the hook is in PostToolUse with matcher Agent|Task (the link is confirmed AT LAUNCH)
+  OK    the hook is in PreCompact (it writes the handoff sheet)
+  OK    the hook is in SessionStart with matcher "compact" (it injects the sheet)
+  OK    all 10 point at the skill's script (the original or the published copy)
+  OK      ...and all 10 point at THE SAME ONE (not half the skill under construction and half published)
+  OK      POSITIVE CONTROL: the rule accepts BOTH paths and tells them apart
+  OK      POSITIVE CONTROL (T10): the NEW folder `skills/orq/` is also accepted
+  OK      MUTANT (T10): a half migration —5 in `skills/orq/` and 5 in the old one— IS caught
+  OK      MUTANT: a path OUTSIDE the skill is NOT accepted
+  OK      MUTANT: half the skill under construction and half published IS caught
+  OK    the 31 referenced hook files exist
+
+D. SKILL.md <-> CODE
+  OK    the CLI offers subcommands (start, pulse, close, handoff, status, cost, load, decide, zero, wait, integrate, identity, validate, specs, review, terminal, close-lane, agents, selftest)
+  OK    the CLI keeps "start" as a manual route
+  OK    the CLI keeps "pulse" as a manual route
+  OK    the CLI keeps "close" as a manual route
+  OK    the CLI keeps "decide" as a manual route
+  OK    SKILL.md orders creating the Monitor with `pulse`
+  OK    SKILL.md says the skill already started by itself
+  OK    SKILL.md warns what happens if it is not a repository
+  OK    SKILL.md cites references/mini-orchestrator.md and it exists
+  OK    SKILL.md cites references/dispatch.md and it exists
+  OK    SKILL.md cites references/recon.md and it exists
+  OK    SKILL.md cites references/dispatch.md and it exists
+  OK    SKILL.md cites references/brief-template.md and it exists
+  OK    SKILL.md cites references/mini-orchestrator.md and it exists
+  OK    SKILL.md cites references/receipt-template.md and it exists
+  OK    SKILL.md cites references/laws.md and it exists
+  OK    SKILL.md cites references/resume-and-close.md and it exists
+  OK    SKILL.md cites references/control-phase-1-and-2.md and it exists
+  OK    SKILL.md points at the script inside the skill
+
+E. DOCUMENTATION <-> CODE
+  FAIL  the code declares the 16 gates (there are 17)
+  OK    gate "third_round" documented
+  OK    gate "third_round" is fired by someone in the code
+  OK    gate "delivery_published" documented
+  OK    gate "delivery_published" is fired by someone in the code
+  OK    gate "overlap_stale" documented
+  OK    gate "overlap_stale" is fired by someone in the code
+  OK    gate "task_identity" documented
+  OK    gate "task_identity" is fired by someone in the code
+  OK    gate "receipt_missing" documented
+  OK    gate "receipt_missing" is fired by someone in the code
+  OK    gate "zero_unchecked" documented
+  OK    gate "zero_unchecked" is fired by someone in the code
+  OK    gate "person_identity" documented
+  OK    gate "person_identity" is fired by someone in the code
+  OK    gate "wait_expired" documented
+  OK    gate "wait_expired" is fired by someone in the code
+  OK    gate "pr_state" documented
+  OK    gate "pr_state" is fired by someone in the code
+  OK    gate "orchestrator_builds" documented
+  OK    gate "orchestrator_builds" is fired by someone in the code
+  OK    gate "spec_stale" documented
+  OK    gate "spec_stale" is fired by someone in the code
+  OK    gate "terminal_load" documented
+  OK    gate "terminal_load" is fired by someone in the code
+  OK    gate "own_load" documented
+  OK    gate "own_load" is fired by someone in the code
+  OK    gate "lane_handoff" documented
+  OK    gate "lane_handoff" is fired by someone in the code
+  OK    gate "silent_stop" documented
+  OK    gate "silent_stop" is fired by someone in the code
+  OK    gate "unaccredited_delegation" documented
+  OK    gate "unaccredited_delegation" is fired by someone in the code
+  FAIL  gate "repeated_red" documented  <- its row is missing in references/control-phase-1-and-2.md
+  OK    gate "repeated_red" is fired by someone in the code
+  OK    the docs' gate table is found
+  FAIL  the table names between 17 and 17 gates (it names 16)  <- rows pending: none
+  OK    gate "third_round" of the docs exists in the code
+  OK    gate "delivery_published" of the docs exists in the code
+  OK    gate "task_identity" of the docs exists in the code
+  OK    gate "receipt_missing" of the docs exists in the code
+  OK    gate "zero_unchecked" of the docs exists in the code
+  OK    gate "person_identity" of the docs exists in the code
+  OK    gate "overlap_stale" of the docs exists in the code
+  OK    gate "wait_expired" of the docs exists in the code
+  OK    gate "pr_state" of the docs exists in the code
+  OK    gate "orchestrator_builds" of the docs exists in the code
+  OK    gate "spec_stale" of the docs exists in the code
+  OK    gate "terminal_load" of the docs exists in the code
+  OK    gate "own_load" of the docs exists in the code
+  OK    gate "lane_handoff" of the docs exists in the code
+  OK    gate "silent_stop" of the docs exists in the code
+  OK    gate "unaccredited_delegation" of the docs exists in the code
+  OK    the code declares the function of the own_load gate
+  OK    `handleStop` calls checkOwnLoad (otherwise the own warning never comes out)
+  OK    the own warning is marked with `warned_own`, distinct from `warned_stop`
+  OK    the re-arming of `warned_own` lives in `noteSession`, not only in the Stop
+  OK      ...and the gate NO LONGER re-arms on its own (a single source of truth)
+  OK    the Stop demands a registered owner AND an explicit session_id match (H2-bis)
+  OK      ...and `isOwnerSession` (the tolerant one) no longer gates that Stop block
+  OK      ...and the own gate does not convert the session_id either: it demands a string
+  OK    `noteSession` demands that the session_id be a string, it does not convert it
+  OK    `heights` does not start reading the configuration without a budget
+  OK      ...and `heightsConfig` neither
+  OK    the skill's config exists and declares the two heights
+  OK      ...and it is valid JSON with warning < airbag <= 1,000,000
+  OK      ...with the numbers the owner signed on 09-15: warning 500,000, airbag 600,000
+  OK    the code reads THAT config and lets it be overridden for tests (ORCH_CONFIG)
+  OK    the skill's root is resolved ONCE and covers the copy in scripts/published/
+  OK    only the whitelist may name settingsPath() (those naming it: settingsPath, airbagFromSettings, airbagState, syncAirbag, inheritAirbagMark)
+  OK    and of those, only syncAirbag WRITES (those writing: syncAirbag)
+  OK    settingsPath() as a direct argument is only READ (uses: readFileSync, readFileSync, statSync)
+  OK      ...control: without a mutant, the guard passes
+  OK      ...mutant 1: `openSync(settingsPath(), "w")` in another function comes out RED
+  OK      ...mutant 2: a write split over two lines in another function comes out RED
+  OK      ...mutant 3: a second alias in another function comes out RED
+  OK      ...mutant 4: a second alias INSIDE `airbagFromSettings` (whitelist) comes out RED
+  OK      ...mutant 5: `fs.writeFile` (asynchronous) on an alias comes out RED
+  OK      ...mutant 6: a top-level arrow no longer inherits the permission of the previous function
+  OK      ...mutant 7: an alias BETWEEN PARENTHESES (`const b = (a);`) comes out RED
+  OK      ...mutant 8: an alias by REASSIGNMENT (`let b; b = a;`) comes out RED
+  OK      ...mutant 9: target BEHIND another call (`renameSync(path.join(..), target)`) comes out RED
+  OK      ...mutant 10: an `async function` no longer inherits the permission of the previous function
+  OK      ...control: the write that guard watches exists as-is in the source
+  OK      ...and the temporary of that write is EXCLUSIVE to this process (pid + clock)
+  OK    the code distinguishes the TWO heights (warning and airbag), not just one
+  OK      ...and without a valid config it falls back to the `autoCompactWindow` of settings.json
+  OK    the code seeds the handover template (the AI does not invent it)
+  OK      ...and the template carries the section "1. MANDATE"
+  OK      ...and the template carries the section "2. RESUME"
+  OK      ...and the template carries the section "3. LOCAL STATE"
+  OK      ...and the template carries the section "4. RESULTS"
+  OK      ...and the template carries the section "5. VERIFICATION"
+  OK      ...and the template carries the section "6. PENDING"
+  OK      ...and the template carries the section "7. REVIEWS"
+  OK      ...and the template carries the section "8. COORDINATION"
+  OK      ...and the template carries the section "9. WARNINGS"
+  OK    `handlePostToolUse` detects the written handover (otherwise nobody finds out)
+  OK      ...and only inside the handovers folder OF THIS ledger (the path comes from the payload)
+  OK    the terminal's Stop confirms its handover to it only once, and tells it to CARRY ON
+  OK    the re-arming NO LONGER deletes the handover (its own terminal consumes it on compacting)
+  OK      ...and what moves it to `handovers_read` is the return from compacting
+  OK    `SessionStart(compact)` ALWAYS starts with «YOU JUST COMPACTED», with time and %
+  OK      ...and with no handover it says so, instead of staying silent
+  OK    the Stop repeats the short line ONCE, and only with a recent compaction
+  OK      ...and «recent» is a measured window, not «at some point»
+  OK    the `lane_handoff` gate is fired by the owner's Stop AND by the pulse
+  OK      ...and it NO LONGER orders anyone to launch: it reports that the lane compacted and carries on
+  OK    the handoff sheet lists the lanes that compacted (with their handover)
+  OK      ...and a sheet WITHOUT that section is not injected: it is regenerated from the ledger
+  OK    `status` (load board) lists compactions and last handover read per session
+  OK    no text of the hook says /Close and write/ (nobody ends terminals)
+  OK      ...nor does the brief template say /Close and write/
+  OK    no text of the hook says /close this terminal/ (nobody ends terminals)
+  OK      ...nor does the brief template say /close this terminal/
+  OK    no text of the hook says /relaunch\w*/i (nobody ends terminals)
+  OK      ...nor does the brief template say /relaunch\w*/i
+  OK    no text of the hook says /relaunch the\b/i (nobody ends terminals)
+  OK      ...nor does the brief template say /relaunch the\b/i
+  OK    no text of the hook says /relaunch\w*\s+(the|this|your)\s+(lane|terminal|lead)/i (nobody ends terminals)
+  OK      ...nor does the brief template say /relaunch\w*\s+(the|this|your)\s+(lane|terminal|lead)/i
+  OK    no text of the hook says /new lead/i (nobody ends terminals)
+  OK      ...nor does the brief template say /new lead/i
+  OK    the context note lives INSIDE the skill (its own code, not a require of the old hook)
+  OK      ...and EVERY session writes it in PreCompact, not only the owner
+  OK      ...and SessionStart(compact) gives it back to that same session and archives it
+  OK      ...without ceasing to give the handoff sheet to the owner in the SAME block
+  OK    the brief template carries the block "If the load warning reaches you (half-height mark)"
+  OK      ...and it comes BEFORE "## ESCALATE IF" (read before escalating, not after)
+  OK      ...and it orders the three things: write the handover for yourself, carry on, and read it on return
+  OK      ...and it makes clear that NOBODY replaces her or takes her out of that terminal
+  OK      ...naming the nine sections the hook seeds
+  OK      ...and without ordering anything blocked: «WARN yes; ORDER no»
+  OK    the brief template carries "## Affected specs"
+  OK    the brief template carries "## Lane size"
+  OK    the template names references/mini-orchestrator.md
+  OK    references/mini-orchestrator.md exists
+  OK    the code declares the SAME section as the template ("Affected specs")
+  OK    the code looks for the map by the name the skill documents (specs-map.json)
+  OK    SKILL.md orders measuring the lane size and naming the mini-orchestrator
+  OK    the CLI offers the subcommand "specs"
+  OK    variable ORCH_CONTROL_OFF documented
+  OK    variable ORCH_CONTROL_DEBUG documented
+  OK    variable ORCH_CONFIG documented
+  OK    variable ORCH_CONTROL_STATE documented
+  OK    variable ORCH_AGENTS_BYTES documented
+  FAIL  variable ORQ_HOOK documented
+  OK    variable ORCH_CAPTURE documented
+  OK    variable ORCH_TEMPLATE documented
+  OK    variable ORCH_CODEX_CMD documented
+  OK    variable ORCH_CODEX_CMD of the docs is read by the code
+  OK    variable ORCH_CAPTURE of the docs is read by the code
+  OK    variable ORCH_CONFIG of the docs is read by the code
+  OK    variable ORCH_CONTROL_OFF of the docs is read by the code
+  OK    variable ORCH_CONTROL_STATE of the docs is read by the code
+  OK    variable ORCH_TEMPLATE of the docs is read by the code
+  OK    variable ORCH_CONTROL_DEBUG of the docs is read by the code
+  OK    variable ORCH_AGENTS_BYTES of the docs is read by the code
+
+F. TESTS <-> CODE
+  OK    test-orchestrator-control.mjs falls back to the installed original when there is no ORQ_HOOK
+  OK    test-orchestrator-control-adversarial.mjs falls back to the installed original when there is no ORQ_HOOK
+  OK    the docs order running the tests by their real path
+
+G-bis. INSTALLED IS NOT ACTIVATED
+  OK    the code has the active-program guard
+  OK    hookMode exits early if there is no program
+  OK    without a git repository there is no ledger (there is no fallback route)
+  OK    the docs warn that installed is not activated
+  OK    the code recognises the load of THE skill by its exact name
+  OK      ...and accepts the LONG name only for the transition, with its own constant
+  OK    a failed startup is NOT silent
+  OK    the close-by-abandonment exists
+  OK    the waits are born by themselves
+  OK    a lost event is stated in the log
+
+G. THE PHASE IS STILL PHASE 1
+  OK    GLOBAL_MODE is still 'OBSERVE'
+  OK    no gate is set to GATE
+  OK    the docs say it is in phase 1
+
+H. PIECES OF A COLLABORATOR'S BRANCH (issue #1)
+  OK    references/brief-template.md exists
+  OK    references/receipt-template.md exists
+  OK    SKILL.md points at the moved brief template
+  OK    SKILL.md NO LONGER carries the big brief block embedded
+  OK    the moved template DOES carry the lane lead's role
+  OK    SKILL.md wires the receipt to references/receipt-template.md
+  OK    the brief template NO LONGER asks for free report prose
+  OK    the receipt template has its 7 fixed headings
+  OK    the CLI offers the subcommand "validate"
+  OK    the script documents the use of "validate" in its header
+  OK    the brief template carries the ESCALATE IF block
+  OK    the brief template carries the NEVER YOURS block
+  OK    references/laws.md carries the receipt sampling rule
+  OK    references/dispatch.md carries "collecting evidence is not verifying"
+  OK    references/laws.md carries "open the most important test and ask what would make it fail"
+  OK    the brief template carries the additive rule
+  OK    the code of validate applies the additive threshold of 50
+  OK    the deadline of the review is 30 min, not 20 (the hook suite is no longer a short cycle)
+  OK    the review says how long the hook suite takes (~15-20 min with > 8 GB)
+  OK      MUTANT (12): with the old deadline, the deadline rule fails
+  OK      MUTANT (12): without the waiting phrase, the datum rule fails
+
+I. THE SKILL'S AGENTS (T7, 2026-09-16)
+  OK    agents/disposable-reader.md exists
+  FAIL    ...agents/disposable-reader.md has a readable --- ... --- frontmatter
+  FAIL    ...the mark "# managed-by: orq" is the FIRST line of the frontmatter
+  FAIL    ...`name: disposable-reader` matches the file name
+  FAIL    ...`model: haiku` is the expected one
+  FAIL    ...it is read-only: it carries `tools:` and does not carry Write/Edit/NotebookEdit
+  OK    agents/receipt-verifier.md exists
+  OK      ...agents/receipt-verifier.md has a readable --- ... --- frontmatter
+  OK      ...the mark "# managed-by: orq" is the FIRST line of the frontmatter
+  OK      ...`name: receipt-verifier` matches the file name
+  OK      ...`model: sonnet` is the expected one
+  OK      ...it is read-only: it carries `tools:` and does not carry Write/Edit/NotebookEdit
+  OK    agents/lane-lead.md exists
+  FAIL    ...agents/lane-lead.md has a readable --- ... --- frontmatter
+  FAIL    ...the mark "# managed-by: orq" is the FIRST line of the frontmatter
+  FAIL    ...`name: lane-lead` matches the file name
+  FAIL    ...`model: opus` is the expected one
+  OK    references/receipt-template.md carries the line "Recommended next step"
+
+I-bis. THE SKILL IS CALLED `orq` (T10, 2026-09-21)
+  OK    SKILL.md declares `name: orq`
+  OK      POSITIVE CONTROL: the `name:` reader does read the frontmatter
+  OK    the bridge command commands/orq.md does NOT exist
+  OK    the skill carries EXACTLY 1 command (`dashboard.md`)
+  FAIL    ...commands/dashboard.md has readable frontmatter
+  FAIL    ...commands/dashboard.md carries the mark "# managed-by: orq"  <- gitdir: ../../modules/commands/dashboard
+  OK      MUTANT: with two commands the count would NOT pass
+  OK      MUTANT: the OLD mark is NOT accepted in the skill's files
+  OK    no doc orders REVIEW with gpt-6-astra (--model/-m); historical quotes and the Astra reservation stay
+  OK      POSITIVE CONTROL: the rule DOES catch a "--model gpt-6-astra"
+  OK      POSITIVE CONTROL: and does NOT catch a historical quote or the phrase that reserves Astra
+
+STRUCTURE: 259 OK, 15 FAILS

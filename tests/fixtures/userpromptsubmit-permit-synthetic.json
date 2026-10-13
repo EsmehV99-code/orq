@@ -1,0 +1,9 @@
+{
+  "_synthetic": "SYNTHETIC: `UserPromptSubmit` payload written by hand by T5 on 2026-09-22, NOT a capture of a real session of the owner's. The fields and their names were taken from the Claude Code hooks docs and checked against the hook that already lives in production on this machine and reads this event (`~/.claude/hooks/scope-before-building.js:98`, `String((d && d.prompt) || '')`). The `cwd` and the `session_id` are overridden by the suite with its own.",
+  "hook_event_name": "UserPromptSubmit",
+  "session_id": "synthetic-test-session",
+  "transcript_path": "C:/synthetic/path/transcript.jsonl",
+  "cwd": "C:/synthetic/path/repo",
+  "permission_mode": "default",
+  "prompt": "/orq-merge-permit"
+}

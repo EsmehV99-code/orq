@@ -1,0 +1,182 @@
+{
+  "_comment": "Toy ledger for tests/test-dashboard.mjs. Times go in as @@...@@ marks that the suite swaps for real dates when copying it: if they were fixed, the 24 h alerts window would go stale and the test would turn red just by time passing.",
+  "version": 1,
+  "created_at": "@@40H_AGO@@",
+  "started_at": "@@40H_AGO@@",
+  "program_id": "orch-toy01",
+  "mode": "OBSERVE",
+  "last_event_at": "@@30M_AGO@@",
+  "owner_session": "s1111111-2222-3333-4444-555555555555",
+  "gates": {
+    "orchestrator_builds": "OBSERVE",
+    "receipt_missing": "OBSERVE"
+  },
+  "sessions": {
+    "s1111111-2222-3333-4444-555555555555": {
+      "role": "owner",
+      "context_tokens": 412000,
+      "context_at": "@@30M_AGO@@",
+      "last_time": "@@30M_AGO@@",
+      "compactions": 1,
+      "cwd": "/tmp/toy/repo"
+    },
+    "s9999999-8888-7777-6666-555555555555": {
+      "role": "lane",
+      "context_tokens": 250000,
+      "compactions": 0,
+      "last_time": "@@2H_AGO@@"
+    }
+  },
+  "lanes": {
+    "/tmp/toy/repo": {
+      "cwd": "/tmp/toy/repo",
+      "head": "abc1234def5678",
+      "branch": "master",
+      "seen_at": "@@30M_AGO@@"
+    }
+  },
+  "terminals": {
+    "T3": {
+      "name": "wt-factory",
+      "at": "@@2H_AGO@@",
+      "session": "s9999999-8888-7777-6666-555555555555"
+    }
+  },
+  "agents": {
+    "aaaa1111": {
+      "id": "aaaa1111",
+      "desc": "T1 lead: the piece that keeps compacting",
+      "type": "general-purpose",
+      "model": "opus",
+      "ctx": 690000,
+      "max": 700000,
+      "compactions": 3,
+      "mtime": "@@MS_10M_AGO@@",
+      "measured_at": "@@30M_AGO@@"
+    },
+    "bbbb2222": {
+      "id": "bbbb2222",
+      "desc": "T2 the piece that already delivered",
+      "type": "general-purpose",
+      "model": "sonnet",
+      "ctx": 180000,
+      "max": 180000,
+      "compactions": 0,
+      "_why_recent_mtime": "T2 already DELIVERED (status READY) but its conversation file was touched a moment ago: if the clock ruled over the status it would show up as if it were working. It is the case the owner saw on 09-17 at 12:00 with T10.",
+      "mtime": "@@MS_5M_AGO@@",
+      "measured_at": "@@2H_AGO@@"
+    },
+    "cccc3333": {
+      "id": "cccc3333",
+      "desc": "disposable reader: count the adversary tests",
+      "type": "disposable-reader",
+      "model": "haiku",
+      "ctx": 30000,
+      "max": 30000,
+      "compactions": 0,
+      "mtime": "@@MS_5M_AGO@@",
+      "measured_at": "@@2H_AGO@@"
+    },
+    "cccc4444": {
+      "_why": "SAME description as cccc3333 ON PURPOSE: two readers launched with the same text merged into one and the count came up short (Codex gpt-5.6-sol, round 3, point b).",
+      "id": "cccc4444",
+      "desc": "disposable reader: count the adversary tests",
+      "type": "disposable-reader",
+      "model": "haiku",
+      "ctx": 25000,
+      "max": 25000,
+      "compactions": 0,
+      "mtime": "@@MS_5M_AGO@@",
+      "measured_at": "@@2H_AGO@@"
+    }
+  },
+  "dispatches": [
+    { "path": "/tmp/toy/splits/BRIEF-T1-the-piece-that-compacts.md", "at": "@@40H_AGO@@" },
+    { "path": "/tmp/toy/splits/BRIEF-T3-named-terminal.md", "at": "@@2H_AGO@@" },
+    { "path": "/tmp/toy/splits/RECEIPT-T2.md", "at": "@@2H_AGO@@" }
+  ],
+  "receipts": {
+    "T2": {
+      "at": "@@2H_AGO@@",
+      "status": "READY",
+      "next_step": "integrate: the full suite passes green and nothing else is open",
+      "path": "/tmp/toy/splits/RECEIPT-T2.md"
+    }
+  },
+  "artifacts": {
+    "t3 named terminal": {
+      "rounds": 2,
+      "status": "OPEN",
+      "decision": null,
+      "first": "@@2H_AGO@@",
+      "last_update": "@@5M_AGO@@",
+      "total": 2
+    }
+  },
+  "reviews": [
+    { "lane": "T3", "round": 2, "model": "gpt-5.6-sol", "at": "@@30M_AGO@@", "approved": false }
+  ],
+  "waits": [
+    {
+      "id": "w-expired01",
+      "what": "the subagent \"T1 lead: the piece that keeps compacting\"",
+      "deadline": "@@2H_AGO@@",
+      "status": "EXPIRED",
+      "created_at": "@@40H_AGO@@",
+      "automatic": true,
+      "no_known_close": true,
+      "data": { "type": "subagent" }
+    },
+    {
+      "id": "w-waiting1",
+      "what": "the background job: the adversary's long suite",
+      "deadline": "@@IN_2H@@",
+      "status": "WAITING",
+      "created_at": "@@30M_AGO@@",
+      "automatic": true,
+      "data": { "type": "background" }
+    },
+    {
+      "id": "w-closed01",
+      "what": "the disposable reader for the adversary's tests",
+      "deadline": "@@2H_AGO@@",
+      "status": "CLOSED",
+      "created_at": "@@40H_AGO@@",
+      "closed_at": "@@2H_AGO@@",
+      "data": { "type": "subagent" }
+    }
+  ],
+  "alerts": [
+    {
+      "at": "@@30M_AGO@@",
+      "gate": "startup",
+      "mode": "OBSERVE",
+      "for_human": true,
+      "text": "You have to decide this yourself: lane T1 is on its third compaction over the same brief.",
+      "data": null
+    },
+    {
+      "at": "@@2H_AGO@@",
+      "gate": "orchestrator_builds",
+      "mode": "OBSERVE",
+      "text": "The orchestrator tried to edit product code. Reference: https://example.invalid/role-rule",
+      "data": null
+    },
+    {
+      "at": "@@40H_AGO@@",
+      "gate": "startup",
+      "mode": "OBSERVE",
+      "for_human": true,
+      "text": "This alert is more than 24 hours old and must NOT show up on the dashboard.",
+      "data": null
+    }
+  ],
+  "counters": {
+    "invocations": 120,
+    "alerts": 3,
+    "by_gate": {
+      "orchestrator_builds": 12,
+      "receipt_missing": 3
+    }
+  }
+}

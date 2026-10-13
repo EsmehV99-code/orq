@@ -1,0 +1,17 @@
+# WHY (2026-09-21): with `core.autocrlf=true` —the usual setting on Windows— a merge
+# or a freshly created worktree left the WORKING COPY in CRLF even though the
+# index was in LF. Two things broke because of it, and both looked like a code
+# failure:
+#   · the MUTANTS of `tests/test-orchestrator-control.mjs` look in the source
+#     for a piece of text written with `\n`; in CRLF they did not find it and the
+#     suite reported «mutant setup… exists as-is in the source», and it also
+#     crashed at the end with an ENOENT;
+#   · comparing `agents/` and `commands/` with the copies already installed
+#     failed by ONE byte of difference per line.
+# Measured on the source repo's `master` after merging T1+T2: 6 failures and a
+# suite crash that do not exist in LF. With this the whole repo is stored and
+# checked out in LF (on macOS this changes nothing; it keeps both systems equal).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary

@@ -1,0 +1,83 @@
+# PROVENANCE (Codex did not write this: it is the fixture's header)
+# REAL review of commit 302fb02 of this same skill, done by Codex
+# gpt-5.6-sol on 2026-09-21 with the orchestrator's improved brief. It brought 10
+# findings where round 1 of lane T1, on the SAME commit, had brought 2.
+# The original text came in PROSE (## HIGH / ## MEDIUM / ## LOW + a numbered
+# list). Here it is ADAPTED to the `FINDING:` block format that the new prompt
+# asks for (PROMPT_VERSION 2), keeping the TITLES, the SEVERITIES and the
+# places VERBATIM. It serves as the positive control of the findings parser: if
+# the parser stops pulling out these 10 titles, the ledger row lies.
+
+FINDING: A state sent to any agent is considered communicated to the orchestrator
+SEVERITY: HIGH
+WHERE: scripts/orchestrator-control.js:5016
+TRIGGER: a `SendMessage` with text `STOPPED · ...` addressed to another lane, not to the owner
+EVIDENCE: `readLaneInItsTurn` checks the text of `input.message`, but never `input.to`; it sets `reading.status=true` and clears `silent_streak`
+REMEDY: accept the state only when `input.to` corresponds to the orchestrator
+
+FINDING: The vocabulary of sent states is wrong: `BLOCKED` is missing and `READY` is extra
+SEVERITY: HIGH
+WHERE: scripts/orchestrator-control.js:4887
+TRIGGER: a correctly sent `BLOCKED`, or a `READY ·` ack at the start of the turn
+EVIDENCE: `RE_STATE_MESSAGE` is `STOPPED|DONE|READY` while the screen recognises `STOPPED|DONE|BLOCKED`
+REMEDY: use `STOPPED|DONE|BLOCKED` for the closing state and leave `READY` only as accreditation
+
+FINDING: The screen regex matches prose and can disable future real alerts
+SEVERITY: HIGH
+WHERE: scripts/orchestrator-control.js:4882
+TRIGGER: a quote, an example or a code block containing `STOPPED ·` or `BLOCKED`
+EVIDENCE: the false positive leaves `silent_streak.warned=true` and silences a later genuine `STOPPED`
+REMEDY: recognise explicit anchored declarations and do not consume the streak with an ambiguous match
+
+FINDING: The abstention on a truncated tail prevents re-arming a streak even when the positive state is visible
+SEVERITY: HIGH
+WHERE: scripts/orchestrator-control.js:4987
+TRIGGER: a huge turn whose start falls outside the 4 MiB but which does end by sending `DONE`
+EVIDENCE: the function returns `null` before looking for state sends, so the streak is not cleared
+REMEDY: return a partial reading and let the positive evidence break the streak
+
+FINDING: `validateBrief` accepts negative mentions or examples as valid instructions
+SEVERITY: HIGH
+WHERE: scripts/orchestrator-control.js:7181
+TRIGGER: a brief that says "Do not use SendMessage; write `STOPPED ·` only on your screen"
+EVIDENCE: it only looks for the substrings `STOPPED ·` and `SendMessage` in the whole section
+REMEDY: require the affirmative instruction, not the mere presence of the substring
+
+FINDING: The accreditation by `from-name` does not accredit identity
+SEVERITY: MEDIUM
+WHERE: scripts/orchestrator-control.js:4997
+TRIGGER: two terminals with the same name, or a quote that contains a similar label
+EVIDENCE: a `from-name` is extracted with a regex from any user text and compared with a mutable name
+REMEDY: validate the stable identifier of `from`, or remove this path
+
+FINDING: The `READY` ack accredits even if it is sent to the wrong recipient or fails
+SEVERITY: MEDIUM
+WHERE: scripts/orchestrator-control.js:5003
+TRIGGER: a `READY ·` sent to another agent, or whose `tool_result` was a failure
+EVIDENCE: `readyAck` is set on the first pass without checking `input.to` or crossing the `tool_use.id`
+REMEDY: reuse the delivery and recipient validation before accepting the ack
+
+FINDING: The new 4 MiB read does not strictly respect the total 9 s budget
+SEVERITY: MEDIUM
+WHERE: scripts/orchestrator-control.js:4944
+TRIGGER: reaching the gate with milliseconds left and a transcript close to 4 MiB
+EVIDENCE: it makes up to four additional passes without checking `END`
+REMEDY: require margin before starting the read and check the deadline in every pass
+
+FINDING: The re-arm test for a new brief does not exercise the real path
+SEVERITY: LOW
+WHERE: tests/test-orchestrator-control.mjs:7969
+TRIGGER: any change that breaks the real path without touching the text `s.silent_streak = null`
+EVIDENCE: it clears `silent_streak` by hand in the JSON and then only looks for that line in the source
+REMEDY: dispatch two `BRIEF-T9-*` paths through the real event and check that the second re-arms
+
+FINDING: The mutant of `isBoldParagraph` for `validate --brief` is vacuous
+SEVERITY: LOW
+WHERE: tests/test-orchestrator-control.mjs:8137
+TRIGGER: a brief that besides the bold paragraph carries a real item
+EVIDENCE: both the healthy and the mutated version return status 0
+REMEDY: a brief whose only content is the `**...**` paragraph
+
+ANGLES APPLIED: false positives and false negatives
+COULD NOT CHECK: the full suite (the read-only sandbox failed to create its temporary directory with EPERM)
+VERDICT: 10 REMAIN

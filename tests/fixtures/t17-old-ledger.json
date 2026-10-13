@@ -1,0 +1,27 @@
+{
+  "owner_session": "dddd1717-owner-fixture",
+  "sessions": {
+    "cccc1717-lane": { "compactions": 4 },
+    "dddd1717-owner-fixture": { "compactions": 4 }
+  },
+  "compactions": [
+    {
+      "session": "cccc1717-lane",
+      "short": "cccc1717",
+      "at": "2026-09-20T10:00:00.000Z",
+      "time": "10:00",
+      "handover": null,
+      "pct": null,
+      "called_at": null
+    },
+    {
+      "session": "dddd1717-owner-fixture",
+      "short": "dddd1717",
+      "at": "2026-09-20T10:05:00.000Z",
+      "time": "10:05",
+      "handover": null,
+      "pct": null,
+      "called_at": null
+    }
+  ]
+}

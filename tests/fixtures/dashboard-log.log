@@ -1,0 +1,25 @@
+2026-09-16T10:07:00.000Z	OBSERVE	orchestrator_builds	Toy log line number 1: here goes the text the gate wrote.
+2026-09-16T10:14:00.000Z	OBSERVE	zero_unchecked	Toy log line number 2: here goes the text the gate wrote.
+2026-09-16T10:21:00.000Z	OBSERVE	wait_expired	This line is one of the 25 and must NOT show up: only the last 20 get drawn.
+2026-09-16T10:28:00.000Z	OBSERVE	delivery_published	Toy log line number 4: here goes the text the gate wrote.
+2026-09-16T10:35:00.000Z	OBSERVE	receipt_missing	Toy log line number 5: here goes the text the gate wrote.
+2026-09-16T10:42:00.000Z	OBSERVE	orchestrator_builds	Toy log line number 6: here goes the text the gate wrote.
+2026-09-16T10:49:00.000Z	OBSERVE	zero_unchecked	Alert with a web address inside: https://example.invalid/rule and http://other.invalid/more — the dashboard defuses it.
+2026-09-16T10:56:00.000Z	OBSERVE	wait_expired	Toy log line number 8: here goes the text the gate wrote.
+2026-09-16T11:03:00.000Z	OBSERVE	delivery_published	Toy log line number 9: here goes the text the gate wrote.
+2026-09-16T11:10:00.000Z	OBSERVE	receipt_missing	Toy log line number 10: here goes the text the gate wrote.
+2026-09-16T11:17:00.000Z	OBSERVE	orchestrator_builds	Toy log line number 11: here goes the text the gate wrote.
+2026-09-16T11:24:00.000Z	OBSERVE	zero_unchecked	Toy log line number 12: here goes the text the gate wrote.
+2026-09-16T11:30:00.000Z	INFO	terminal	T3	wt-factory
+2026-09-16T11:31:00.000Z	OBSERVE	wait_expired	Toy log line number 13: here goes the text the gate wrote.
+2026-09-16T11:38:00.000Z	OBSERVE	delivery_published	Toy log line number 14: here goes the text the gate wrote.
+2026-09-16T11:45:00.000Z	OBSERVE	receipt_missing	Toy log line number 15: here goes the text the gate wrote.
+2026-09-16T11:52:00.000Z	OBSERVE	orchestrator_builds	Toy log line number 16: here goes the text the gate wrote.
+2026-09-16T11:59:00.000Z	OBSERVE	zero_unchecked	Toy log line number 17: here goes the text the gate wrote.
+2026-09-16T12:06:00.000Z	OBSERVE	wait_expired	Toy log line number 18: here goes the text the gate wrote.
+2026-09-16T12:13:00.000Z	OBSERVE	delivery_published	Toy log line number 19: here goes the text the gate wrote.
+2026-09-16T12:20:00.000Z	OBSERVE	receipt_missing	Toy log line number 20: here goes the text the gate wrote.
+2026-09-16T12:27:00.000Z	OBSERVE	orchestrator_builds	Toy log line number 21: here goes the text the gate wrote.
+2026-09-16T12:34:00.000Z	OBSERVE	zero_unchecked	Toy log line number 22: here goes the text the gate wrote.
+2026-09-16T12:41:00.000Z	OBSERVE	wait_expired	Toy log line number 23: here goes the text the gate wrote.
+2026-09-16T12:48:00.000Z	OBSERVE	delivery_published	Toy log line number 24: here goes the text the gate wrote.

@@ -1,0 +1,17 @@
+{
+  "_WHAT_THIS_IS": "SYNTHETIC, NOT A CAPTURE PAYLOAD. T3 wrote it by hand on 2026-09-21 with the shape of a PreToolUse of a SUBAGENT, taking the FIELD NAMES from the real SubagentStop capture (tests/fixtures/capture-subagentstop.json) and from the 09-16 measurement with ORCH_CAPTURE. A PreToolUse of a subagent has NOT been captured for real: transforming the real SubagentStop capture and calling it a capture would be lying. What this proves is the CONTRACT the hook reads (the PARENT's session_id + agent_id/agent_transcript_path/transcript_path under subagents/), not that the harness sends exactly these bytes.",
+  "_FIELDS_THE_SUITE_OVERRIDES": "cwd and session_id are replaced by the suite with the temporary repo and the test's owner session; tool_input.file_path with each case's file.",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "session_id": "3b1f7c2e-0000-0000-0000-000000000000",
+  "transcript_path": "C:/Users/you/.claude/projects/C--Users-you/3b1f7c2e-0000-0000-0000-000000000000.jsonl",
+  "agent_id": "a0af432df4872fd54",
+  "agent_type": "general-purpose",
+  "agent_transcript_path": "C:/Users/you/.claude/projects/C--Users-you/subagents/agent-a0af432df4872fd54.jsonl",
+  "cwd": "C:/Users/you/dev/toy-repo",
+  "tool_input": {
+    "file_path": "src/screen.ts",
+    "old_string": "x",
+    "new_string": "a\nb\nc\nd"
+  }
+}

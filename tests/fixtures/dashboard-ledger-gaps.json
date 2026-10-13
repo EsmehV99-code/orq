@@ -1,0 +1,5 @@
+{
+  "_comment": "Toy ledger missing almost every field: it tests that the dashboard draws 'no data' in each section instead of blowing up, and that it exits with code 0.",
+  "version": 1,
+  "program_id": "orch-gaps01"
+}
