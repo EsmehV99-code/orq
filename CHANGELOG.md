@@ -2,6 +2,13 @@
 
 What you will notice in each release, in plain words, written for the person who uses the skill.
 
+## 1.1.0 — 2026-10-13 — `/splittasks` comes bundled
+
+- `/splittasks` — splits a goal into parallel terminal workstreams, writes one handoff file per lane and opens the terminals itself · now ships inside orq, so one install gives you both.
+- Two variants, one per system: `skills/splittasks-windows/` (Windows Terminal + Git Bash, tested on Windows) and `skills/splittasks-macos/` (Terminal.app through `osascript`, written on macOS by a collaborator, not re-tested for this release). The installer copies the one for your system to `~/.claude/skills/splittasks/`; `--check` looks at it; a file of yours there without the mark is never overwritten.
+- Both variants launch every lane with `--permission-mode auto` — never `--dangerously-skip-permissions` — and never merge a PR with `--admin`: a skill cannot pre-authorize that on your behalf.
+- The small helper that pre-trusts each lane's folder (`claude-trust-paths.sh`, so lanes do not stop at the "Do you trust the files in this folder?" dialog) now ships with the skill instead of being expected in `~/.claude/scripts/`.
+
 ## 1.0.0 — 2026-10-13 — First public release
 
 ### What you can type

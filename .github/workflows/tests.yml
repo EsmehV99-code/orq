@@ -1,0 +1,47 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  suites:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: git identity for the toy repositories the suites create
+        shell: bash
+        run: |
+          git config --global user.name "orq-ci"
+          git config --global user.email "orq-ci@users.noreply.github.com"
+      - name: syntax
+        shell: bash
+        run: for f in scripts/*.js; do node --check "$f"; done
+      - name: structure
+        shell: bash
+        run: node tests/test-structure.mjs
+      - name: install
+        shell: bash
+        run: node tests/test-install.mjs
+      - name: dashboard
+        shell: bash
+        run: node tests/test-dashboard.mjs
+      - name: evidence
+        shell: bash
+        run: node tests/test-evidence.mjs
+      - name: adversarial
+        shell: bash
+        run: node tests/test-orchestrator-control-adversarial.mjs
+      - name: hook
+        shell: bash
+        run: node tests/test-orchestrator-control.mjs

@@ -36,6 +36,8 @@
  *      with THE SAME function the skill load uses (`syncSkillPieces` of
  *      orchestrator-control.js): mark `# managed-by: orq`, never deletes, does not
  *      overwrite a file with no mark.
+ *   2b. skills/splittasks-<windows|macos>/: the variant of THIS system is copied whole to
+ *      `<config>/skills/splittasks` (same mark, same rules); on another system it is skipped.
  *   3. autocompact: it does NOT write it. If `autoCompactWindow` does not match
  *      `airbag_tokens` of orchestrator.config.json, it says so with the why and the
  *      line the person can put in themselves ("the skill warns, it does not write").
@@ -235,6 +237,78 @@ function writeAtomic(file, text, mode) {
   }
 }
 
+/* ------------------------------------------------- the bundled skill: splittasks */
+
+// `skills/splittasks-<platform>/` is copied WHOLE to `<config>/skills/splittasks/`, so that
+// `/splittasks` exists on both systems with the variant that fits. Claude Code only sees
+// `~/.claude/skills/<name>/SKILL.md` (a skill nested inside the orq folder is not a skill),
+// which is why it is copied out. Same rules as agents and commands: every file carries the
+// mark (`# managed-by: orq`: for a `.md` file, in its header as `hasSkillMark` reads it — the
+// frontmatter or the first body line, the old mark accepted on read; for any other file, its
+// first non-empty line), a file of yours without the mark is never touched, and nothing is
+// ever deleted.
+const BUNDLED = { name: 'splittasks', variants: { win32: 'splittasks-windows', darwin: 'splittasks-macos' } };
+const MARK = '# managed-by: orq';
+
+function bundledVariant() {
+  const v = BUNDLED.variants[process.platform];
+  return v ? { variant: v, source: path.join(ROOT, 'skills', v) } : null;
+}
+function fileHasMark(mod, name, text) {
+  if (/\.md$/i.test(name)) return Boolean(mod && mod.hasSkillMark(text));
+  const first = String(text || '').split(/\r?\n/).find((l) => l.trim() !== '');
+  return (first || '').trim() === MARK;
+}
+/** State of every file of the bundled skill against the target folder. Does NOT write.
+ *  Each entry: `{st, txt}` plus `n`/`src` when the file is to be written. */
+function bundledStates(mod, dir) {
+  const out = [];
+  const b = bundledVariant();
+  const tag = `skill ${BUNDLED.name}`;
+  if (!b) { out.push({ st: 'SKIPPED', txt: `${tag}: no variant for this system (${process.platform}); nothing to install` }); return out; }
+  if (!mod) { out.push({ st: 'COULD NOT', txt: `${tag}: I could not load ${HOOK_SCRIPT} to check the marks` }); return out; }
+  let names = [];
+  try { names = fs.readdirSync(b.source).filter((n) => fs.statSync(path.join(b.source, n)).isFile()).sort(); }
+  catch (e) { out.push({ st: 'COULD NOT', txt: `${tag}: I could not read ${b.source} (${msg(e)})` }); return out; }
+  if (!names.length) { out.push({ st: 'COULD NOT', txt: `${tag}: ${b.source} is empty` }); return out; }
+  const target = path.join(dir, 'skills', BUNDLED.name);
+  for (const n of names) {
+    let src = null, dst = null;
+    try { src = fs.readFileSync(path.join(b.source, n), 'utf8'); }
+    catch (e) { out.push({ st: 'COULD NOT', txt: `${tag}/${n}: I could not read the skill's one (${msg(e)})` }); continue; }
+    if (!fileHasMark(mod, n, src)) { out.push({ st: 'COULD NOT', txt: `${tag}/${n}: the skill's file carries no mark (our mistake, not yours): not installed` }); continue; }
+    try { dst = fs.readFileSync(path.join(target, n), 'utf8'); }
+    catch (e) {
+      if (e && e.code === 'ENOENT') out.push({ st: 'MISSING', txt: `${tag}/${n}: not installed`, n, src });
+      else out.push({ st: 'COULD NOT', txt: `${tag}/${n}: I could not read it (${msg(e)})` });
+      continue;
+    }
+    if (dst === src) { out.push({ st: 'OK', txt: `${tag}/${n}: same as the skill's (${b.variant})` }); continue; }
+    if (!fileHasMark(mod, n, dst)) { out.push({ st: 'DIFFERENT', txt: `${tag}/${n}: there is one of YOURS with that name, without the skill's mark: it is not touched (rename it if you want the skill's)`, foreign: true }); continue; }
+    out.push({ st: 'DIFFERENT', txt: `${tag}/${n}: it is an old version of the skill's (\`install.js\` updates it)`, n, src });
+  }
+  return out;
+}
+/** Installs the bundled skill. Returns `{copied, updated, same, error}`; writes into `out`/`gaps`. */
+function installBundled(mod, dir, out, gaps) {
+  const r = { copied: 0, updated: 0, same: 0, error: false };
+  const b = bundledVariant();
+  const target = path.join(dir, 'skills', BUNDLED.name);
+  for (const s of bundledStates(mod, dir)) {
+    if (s.st === 'SKIPPED') { out.push(s.txt); return r; }
+    if (s.st === 'COULD NOT') { gaps.push(s.txt); r.error = true; continue; }
+    if (s.st === 'OK') { r.same++; continue; }
+    if (s.foreign) { gaps.push(s.txt); continue; }
+    try {
+      fs.mkdirSync(target, { recursive: true });
+      writeAtomic(path.join(target, s.n), s.src, null);
+      if (s.st === 'MISSING') r.copied++; else r.updated++;
+    } catch (e) { gaps.push(`skill ${BUNDLED.name}/${s.n}: I could not write it (${msg(e)})`); r.error = true; }
+  }
+  out.push(`skill ${BUNDLED.name} (${target}, variant ${b.variant}): ${r.copied} copied, ${r.updated} updated, ${r.same} same`);
+  return r;
+}
+
 /* --------------------------------------------- the skill's pieces and the airbag */
 
 /** The hook module, loaded WITH NO SIDE EFFECTS (it exports only when it is not the main
@@ -339,6 +413,10 @@ function check(dir) {
         line(ep.st, `${p.title.replace(/s$/, '')} ${n}: ${ep.txt}`);
       }
     }
+    for (const b of bundledStates(mod, dir)) {
+      if (b.st === 'SKIPPED') out.push(`${'SKIPPED'.padEnd(9)} ${b.txt}`);
+      else line(b.st, b.txt);
+    }
     // The autocompact WARNS, it does not count as "missing": the number is each
     // person's decision ("put the number you prefer", the owner, issue #8).
     if (s) {
@@ -363,7 +441,7 @@ function install(dir) {
   const done = (code) => { process.stdout.write(out.join('\n') + '\n'); return code; };
   const stop = (cause) => {
     out.push(`STOP: ${cause}`);
-    out.push('I touched nothing: neither settings.json, nor agents, nor commands. No backup (it was not needed).');
+    out.push('I touched nothing: neither settings.json, nor agents, nor commands, nor the splittasks skill. No backup (it was not needed).');
     return done(1);
   };
   out.push(`INSTALL orq — configuration folder: ${dir}`);
@@ -396,12 +474,15 @@ function install(dir) {
   // Here only "does not exist" (ENOENT) counts; any other error STOPS (Codex Sol r3 T57, HIGH).
   const modP = hookModule();
   if (!modP) return stop(`I could not load ${HOOK_SCRIPT} (needed to copy agents and commands)`);
-  for (const p of modP.SKILL_PARTS) {
+  const preflight = modP.SKILL_PARTS.map((p) => ({ sub: p.sub, onlyMd: true }));
+  const bv = bundledVariant();
+  if (bv) preflight.push({ sub: path.join('skills', bv.variant), target: path.join('skills', BUNDLED.name), onlyMd: false });
+  for (const p of preflight) {
     let names = [];
-    try { names = fs.readdirSync(path.join(ROOT, p.sub)).filter((n) => n.toLowerCase().endsWith('.md')); }
+    try { names = fs.readdirSync(path.join(ROOT, p.sub)).filter((n) => !p.onlyMd || n.toLowerCase().endsWith('.md')); }
     catch (_) { continue; }   // without that folder in the skill there is nothing to copy (the sync will say so)
     for (const n of names) {
-      const dst = path.join(dir, p.sub, n);
+      const dst = path.join(dir, p.target || p.sub, n);
       // `lstat` first: a DANGLING link gives ENOENT when read but EXISTS, and the sync
       // would replace it (Codex Sol r4 T57). Only the ENOENT of `lstat` means "does not exist".
       let exists = true;
@@ -499,6 +580,10 @@ function install(dir) {
   }
   for (const x of c.extra) gaps.push(`the entry ${extraText(x)} is extra and I am not deleting it (by hand)`);
 
+  // 2b) the bundled skill (splittasks), the variant of this system.
+  const bundled = installBundled(mod, dir, out, gaps);
+  if (bundled.error) piecesError = true;
+
   // 3) autocompact — WARNS, does not write.
   const a = autocompactState(mod, s);
   out.push(`autocompact: ${a.text}`);
@@ -510,8 +595,8 @@ function install(dir) {
     : 'nothing else.';
   out.push('');
   out.push('SUMMARY (for you):');
-  out.push(`1. Installed: ${added.length} new plug(s) and ${fixed.length} fixed in settings.json; ${piecesDone} agent(s)/command(s) copied or updated.`);
-  out.push(`2. Already there: ${alreadyThere.length} of 12 plugs and ${piecesSame} agent(s)/command(s) the same${!changes ? ' — settings.json unchanged' : ''}.`);
+  out.push(`1. Installed: ${added.length} new plug(s) and ${fixed.length} fixed in settings.json; ${piecesDone} agent(s)/command(s) copied or updated; ${bundled.copied + bundled.updated} file(s) of /${BUNDLED.name}.`);
+  out.push(`2. Already there: ${alreadyThere.length} of 12 plugs, ${piecesSame} agent(s)/command(s) and ${bundled.same} file(s) of /${BUNDLED.name} the same${!changes ? ' — settings.json unchanged' : ''}.`);
   out.push(`3. Not done: ${gaps.length ? gaps.join(' · ') : 'nothing.'}`);
   out.push(`4. You have to type: ${type}`);
   out.push('5. Open a NEW terminal: one that is already open does not re-read settings.json. There, inside a git repo, type /orq and it has to show "Orchestration RUNNING".');

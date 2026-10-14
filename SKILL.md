@@ -1,6 +1,6 @@
 ---
 name: orq
-version: 1.0.0
+version: 1.1.0
 description: Turns THIS terminal into the ORCHESTRATOR of several terminals/agents working in parallel on the same repository — and it keeps being that for the rest of the session. Use it when there are (or are about to be) 2 or more terminals, agents or people working at the same time and someone has to take the helm; when someone says "orchestrate", "split the work", "coordinate the terminals", "give me the merge order", "pick up this work someone else left", "I'm about to open several terminals", "split this up"; or when you are receiving reports from other agents and have to decide what is true and what comes next. It does three things: (1) it fixes the role — this terminal does NOT build (unless the owner orders it in the chat, recorded with `allow-edit`), it verifies and dispatches; (2) it runs a RECON of the environment before dispatching anything — which skills, tools, verification recipes, gates and CI triggers exist in THIS project; (3) it writes the briefs with all of that ALREADY RESOLVED inside, so every terminal goes straight to work without discovering it on its own. Its core is DO NOT PROPAGATE LIES: the orchestrator is the node with the most inputs and the least contact with the truth, so it is the one that amplifies error the most if it limits itself to routing. It does NOT replace code review or each lane's own verification — it governs them.
 ---
 

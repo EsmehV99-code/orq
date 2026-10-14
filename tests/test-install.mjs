@@ -494,6 +494,74 @@ untouched('a number that would not survive rewriting', '{"x": 1e400}', 'number t
   assertOk('--help exits with 0, prints the usage and writes nothing', rh.status === 0 && /usage: node scripts\/install\.js/.test(rh.stdout || '') && fs.readdirSync(ch).length === 0, `${rh.status}`);
 }
 
+/* (s) THE BUNDLED SKILL splittasks: the variant of THIS system is copied whole to <config>/skills/splittasks */
+{
+  const VARIANT = { win32: 'splittasks-windows', darwin: 'splittasks-macos' }[process.platform] || null;
+  const fileHasMark = (n, text) => /\.md$/i.test(n)
+    ? /^---\r?\n[\s\S]*?\r?\n---/.test(text) && text.slice(0, 4096).includes(MARK)
+    : (text.split(/\r?\n/).find((l) => l.trim() !== '') || '').trim() === MARK;
+  // POSITIVE CONTROL: both variants exist in the skill, each with a SKILL.md named `splittasks` and marked.
+  for (const v of ['splittasks-windows', 'splittasks-macos']) {
+    const md = bytes(path.join(SKILL, 'skills', v, 'SKILL.md'));
+    assertOk(`(s) the skill carries skills/${v}/SKILL.md with name: splittasks and the mark in its header`,
+      md !== null && /^name:\s*splittasks\s*$/m.test(md.toString('utf8')) && fileHasMark('SKILL.md', md.toString('utf8')), md ? md.toString('utf8').slice(0, 200) : 'missing');
+    // The trust helper both SKILL.md call (`bash "$HOME/.claude/skills/splittasks/claude-trust-paths.sh"`) travels with each variant, marked.
+    const sh = bytes(path.join(SKILL, 'skills', v, 'claude-trust-paths.sh'));
+    assertOk(`(s) the skill carries skills/${v}/claude-trust-paths.sh with the mark on its first line`,
+      sh !== null && fileHasMark('claude-trust-paths.sh', sh.toString('utf8')) && md !== null && md.toString('utf8').includes('skills/splittasks/claude-trust-paths.sh'),
+      sh ? sh.toString('utf8').slice(0, 80) : 'missing');
+  }
+  const d = conf();
+  const r = run(d);
+  const target = path.join(d, 'skills', 'splittasks');
+  if (!VARIANT) {
+    assertOk(`(s) on ${process.platform} there is no variant: it says SKIPPED and installs no splittasks (exit 0)`,
+      r.code === 0 && /skill splittasks: no variant for this system/.test(r.out) && !fs.existsSync(target), r.out.slice(0, 600));
+  } else {
+    const names = fs.readdirSync(path.join(SKILL, 'skills', VARIANT)).filter((n) => fs.statSync(path.join(SKILL, 'skills', VARIANT, n)).isFile()).sort();
+    const good = names.filter((n) => {
+      const dst = bytes(path.join(target, n));
+      return dst && dst.equals(fs.readFileSync(path.join(SKILL, 'skills', VARIANT, n))) && fileHasMark(n, dst.toString('utf8'));
+    });
+    assertOk(`(s) from scratch it copies the ${names.length} file(s) of skills/${VARIANT} to <config>/skills/splittasks, equal and marked (exit 0)`,
+      r.code === 0 && names.length > 0 && good.length === names.length && new RegExp(`skill splittasks \\(.*variant ${VARIANT}\\): ${names.length} copied, 0 updated, 0 same`).test(r.out),
+      `${good.length}/${names.length} · ${r.out.slice(0, 500)}`);
+    assertOk('(s) the summary counts them: "N file(s) of /splittasks" in line 1 and "0 file(s) of /splittasks the same" in line 2',
+      new RegExp(`^1\\. Installed: .*; ${names.length} file\\(s\\) of /splittasks\\.$`).test(summary(r.out)[0] || '') &&
+      /^2\. Already there: .* and 0 file\(s\) of \/splittasks the same/.test(summary(r.out)[1] || ''), summary(r.out).slice(0, 2).join(' | '));
+    const r2 = run(d);
+    assertOk('(s) second run: all the same, nothing copied, bytes untouched',
+      r2.code === 0 && new RegExp(`: 0 copied, 0 updated, ${names.length} same`).test(r2.out) &&
+      names.every((n) => bytes(path.join(target, n)).equals(fs.readFileSync(path.join(SKILL, 'skills', VARIANT, n)))), r2.out.slice(0, 500));
+    const rc = run(d, '--check');
+    assertOk(`(s) --check lists the ${names.length} file(s) as OK and exits with 0`,
+      rc.code === 0 && names.every((n) => new RegExp(`^OK +skill splittasks/${n.replace(/\./g, '\\.')}: same as the skill's`, 'm').test(rc.out)), rc.out.slice(-800));
+    // An OLD version with the mark is updated; a file of YOURS without the mark is not.
+    const old = `---\nname: splittasks\n${MARK}\n---\nold version\n`;
+    fs.writeFileSync(path.join(target, 'SKILL.md'), old);
+    const rc2 = run(d, '--check');
+    assertOk('(s) --check with an old marked copy: DIFFERENT "old version" and exit 1',
+      rc2.code === 1 && /DIFFERENT +skill splittasks\/SKILL\.md: it is an old version/.test(rc2.out), rc2.out.slice(-600));
+    const r3 = run(d);
+    assertOk('(s) install updates the old marked copy (1 updated) and leaves it equal to the skill\'s',
+      r3.code === 0 && /: 0 copied, 1 updated/.test(r3.out) && bytes(path.join(target, 'SKILL.md')).equals(fs.readFileSync(path.join(SKILL, 'skills', VARIANT, 'SKILL.md'))), r3.out.slice(0, 500));
+    const mine = '---\nname: splittasks\ndescription: mine\n---\nThis is MINE and carries no mark.\n';
+    fs.writeFileSync(path.join(target, 'SKILL.md'), mine);
+    const r4 = run(d);
+    assertOk('(s) a SKILL.md of YOURS without the mark: install exits 0, does NOT overwrite it and names it in "3. Not done:"',
+      r4.code === 0 && bytes(path.join(target, 'SKILL.md')).equals(Buffer.from(mine)) && /^3\. Not done: .*skill splittasks\/SKILL\.md.*YOURS/.test(summary(r4.out)[2] || ''), summary(r4.out).join(' | '));
+    const rc4 = run(d, '--check');
+    assertOk('(s) --check names it as DIFFERENT (yours, without the mark) and exits with 1',
+      rc4.code === 1 && /DIFFERENT +skill splittasks\/SKILL\.md: there is one of YOURS/.test(rc4.out), rc4.out.slice(-600));
+    // PREFLIGHT: a target that exists but cannot be read (a folder called SKILL.md) STOPS before writing anything (as h2).
+    const d2 = conf();
+    fs.mkdirSync(path.join(d2, 'skills', 'splittasks', 'SKILL.md'), { recursive: true });
+    const r5 = run(d2);
+    assertOk('(s) an unreadable target SKILL.md: exit 1, the cause, and nothing written (no settings.json, no agents)',
+      r5.code === 1 && /STOP: I cannot read .*splittasks.*SKILL\.md .*I am not overwriting it/.test(r5.out) && !fs.existsSync(file(d2)) && !fs.existsSync(path.join(d2, 'agents')), r5.out.slice(0, 500));
+  }
+}
+
 assertOk('THE REAL SETTINGS.JSON DID NOT CHANGE (whole fingerprint before and after)', fingerprint(REAL) === realBefore, `${realBefore} → ${fingerprint(REAL)}`);
 
 for (const d of folders) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* Windows sometimes holds on */ } }

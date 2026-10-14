@@ -1,5 +1,6 @@
 # orq — run several Claude Code terminals in parallel, and trust what they hand back
 
+[![tests](https://github.com/EsmehV99-code/orq/actions/workflows/tests.yml/badge.svg)](https://github.com/EsmehV99-code/orq/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platforms: Windows | macOS](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-lightgrey)
 ![Needs: Node.js](https://img.shields.io/badge/needs-Node.js-green)
@@ -24,8 +25,9 @@ git clone https://github.com/EsmehV99-code/orq ~/.claude/skills/orq
 node ~/.claude/skills/orq/scripts/install.js
 ```
 
-Then, in a new Claude Code terminal inside a git repository, type `/orq`. Details in
-[Installation](#installation).
+Then, in a new Claude Code terminal inside a git repository, type `/orq`. The installer also puts
+the bundled **`/splittasks`** skill (splits a goal into parallel terminals and opens them) in the
+variant of your system — Windows or macOS. Details in [Installation](#installation).
 
 **Live map, with clicks:** open [`docs/map.html`](docs/map.html) (double click, no internet needed): the
 same drawing, and clicking each box shows its real wiring.
@@ -120,6 +122,8 @@ agents/                          the three agents (lane-lead, disposable-reader,
                                  the skill copies them to ~/.claude/agents/ on load
 commands/                        the commands the owner types (/dashboard, /orq-git-permit, /orq-merge-permit,
                                  /orq-batch-closed, /orq-install); the skill copies them to ~/.claude/commands/ on load
+skills/                          the bundled /splittasks skill, one variant per system (splittasks-windows/,
+                                 splittasks-macos/); the installer copies the right one to ~/.claude/skills/splittasks/
 docs/                            the circuit (Mermaid + interactive HTML), the clickable map (map.html),
                                  and the cover drawing (cover.svg)
 tests/                           suites: structure, hook, adversarial, dashboard, evidence and install; toy fixtures
@@ -211,7 +215,11 @@ Run any subcommand without arguments to see its own `usage:` text; the lines abo
    always answer NOT GRANTED).
 3. **What is copied by itself:** when the skill loads (`/orq`) and when installing, `agents/` goes to
    `~/.claude/agents/` and `commands/` to `~/.claude/commands/`, with the mark `# managed-by: orq`.
-   Nothing else is copied, and a file of yours without that mark is not overwritten.
+   **When installing**, the bundled `/splittasks` skill goes to `~/.claude/skills/splittasks/` too —
+   **the variant of your system**: `skills/splittasks-windows/` on Windows (Windows Terminal +
+   Git Bash), `skills/splittasks-macos/` on macOS (Terminal.app through `osascript`); on any other
+   system it is skipped and says so. Nothing else is copied, and a file of yours without that mark
+   is not overwritten.
 4. **Check it is right**, in a NEW terminal inside a git repository:
    - `node ~/.claude/skills/orq/scripts/install.js --check` → writes nothing; says one by one what
      is there, what is missing and what differs (hook, path, timeout, `type`, agent, command) and the
@@ -256,6 +264,8 @@ the old mark on READ, so the copies already installed can be updated.
 - `~/.claude/agents/`: managed copy of `agents/` (mark `# managed-by: orq`).
 - `~/.claude/commands/`: managed copy of `commands/` (`dashboard.md`, `orq-git-permit.md`,
   `orq-merge-permit.md`, `orq-batch-closed.md` and `orq-install.md`), with the same mark.
+- `~/.claude/skills/splittasks/`: managed copy of `skills/splittasks-<your system>/`, with the same
+  mark (put there by the installer only, not by the skill load).
 
 Everything else lives inside this folder. In the repo being orchestrated, the ledger
 (`orchestrator-state.json`), its log and the Codex reviews (`.git/orchestrator-reviews/`) live in
