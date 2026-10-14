@@ -1,16 +1,19 @@
 ---
 # managed-by: orq
-name: splittasks
-description: Split a complex goal into parallel terminal workstreams. Assigns each terminal a role and model (Sonnet/Opus; never Haiku), writes handoff .md files to ./splits/ in the project root, opens the terminals itself (wt.exe + Git Bash, lanes in --permission-mode auto) and prints a briefing. (Windows variant; installed by orq's installer)
+name: splittasks-windows
+description: Split a complex goal into parallel terminal workstreams. Assigns each terminal a role and model (Sonnet/Opus; never Haiku), writes handoff .md files to ./splits/ in the project root, opens the terminals itself (wt.exe + Git Bash, lanes in --permission-mode auto) and prints a briefing. (Windows variant. Installed by hand: orq's installer copies it to ~/.claude/skills/splittasks/, so /splittasks invokes it. As a plugin: /orq:splittasks-windows)
 triggers: ["/splittasks"]
 ---
 
 # /splittasks — Multi-Terminal Parallel Orchestration (Windows)
 
 > **Platform variant: Windows** (Git Bash + Windows Terminal). The macOS variant lives at
-> `skills/splittasks-macos/` in the orq repo. `node ~/.claude/skills/orq/scripts/install.js`
-> copies the right one for your OS to `~/.claude/skills/splittasks/`, so the command is always
-> `/splittasks`. This variant has been tested on Windows (real runs; see the Changelog at the end).
+> `skills/splittasks-macos/` in the orq repo. Installed by hand, `node ~/.claude/skills/orq/scripts/install.js`
+> copies the right one for your OS to `~/.claude/skills/splittasks/`, so the command is `/splittasks`.
+> As the orq **plugin** nothing is copied: the skill is `/orq:splittasks-windows` and its files
+> (`claude-trust-paths.sh`, `close-lanes.ps1`) stay in `${CLAUDE_PLUGIN_ROOT}/skills/splittasks-windows/`
+> (Claude Code fills that variable in when it renders this skill; auto-launch rule 7 calls that folder
+> `<SKILL_DIR>`). This variant has been tested on Windows (real runs; see the Changelog at the end).
 
 Splits one big goal into parallel workstreams across multiple Claude Code terminals, each with the right model and a self-contained handoff file. Windows-only (Git Bash + Windows Terminal), unattended-safe.
 
@@ -495,8 +498,10 @@ spawned from the session via `wt.exe` did its work in 10 s). Rules:
    `git -C $WT_ROOT/T<N> log --oneline $BASE_SHA..`). Only then close ONLY the session's window
    with the helper shipped next to this file:
    ```
-   powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\you\.claude\skills\splittasks\close-lanes.ps1" -TitlePart "splittasks-<SESSION_ID>"
+   powershell -NoProfile -ExecutionPolicy Bypass -File "<SKILL_DIR>\close-lanes.ps1" -TitlePart "splittasks-<SESSION_ID>"
    ```
+   (`<SKILL_DIR>` is the folder of this file, as rule 7 resolves it: `C:\Users\you\.claude\skills\splittasks`
+   installed by hand, `${CLAUDE_PLUGIN_ROOT}/skills/splittasks-windows` as the orq plugin.)
    It finds the window by literal title (WT keeps `splittasks-<SESSION_ID>` there thanks to
    `--suppressApplicationTitle`, in LAUNCH.sh and RELAUNCH alike), sends WM_CLOSE and presses the
    «Close all» button of WT's «Do you want to close all tabs?» dialog through UI Automation inside
@@ -509,8 +514,13 @@ spawned from the session via `wt.exe` did its work in 10 s). Rules:
 7. **Generate LAUNCH.sh / RELAUNCH-T<N>.sh from THIS FILE ON DISK, never from the rendered skill
    text.** When the skill is invoked as `/splittasks <goal>`, the Skill tool substitutes `$1`,
    `$2`, `$0` in the rendered text with words from the goal, which silently corrupts the templates.
-   Extract each fenced block with `awk` from `~/.claude/skills/splittasks/SKILL.md`
-   and then `sed` the placeholders.
+   Extract each fenced block with `awk` from `<SKILL_DIR>/SKILL.md` and then `sed` the placeholders.
+   **`<SKILL_DIR>` is the folder this file lives in:** `~/.claude/skills/splittasks` installed by hand;
+   `${CLAUDE_PLUGIN_ROOT}/skills/splittasks-windows` as the orq plugin (Claude Code fills that variable
+   in when it renders this skill; if you are reading it here as a literal `${…}`, you are the manual
+   install). `<SKILL_DIR>` is also a placeholder of the templates — `sed` it like `<SESSION_ID>`:
+   LAUNCH.sh and RELAUNCH take `claude-trust-paths.sh` from there, and rule 6 takes `close-lanes.ps1`
+   from there. Left unfilled, the templates fall back to the manual path.
 
 ### LAUNCH.sh template (Windows-only)
 
@@ -800,7 +810,12 @@ trust_paths=()
 for lane in $LANES; do
   trust_paths+=("$WT_ROOT/$lane")
 done
-trust_helper="$HOME/.claude/skills/splittasks/claude-trust-paths.sh"
+# <SKILL_DIR> = the folder of the SKILL.md these templates came from (auto-launch rule 7):
+# `~/.claude/skills/splittasks` by hand, `<plugin root>/skills/splittasks-windows` as the orq plugin.
+# Left unfilled (or pointing nowhere), fall back to the manual path.
+SKILL_DIR="<SKILL_DIR>"
+[ -d "$SKILL_DIR" ] || SKILL_DIR="$HOME/.claude/skills/splittasks"
+trust_helper="$SKILL_DIR/claude-trust-paths.sh"
 if [ -f "$trust_helper" ]; then
   bash "$trust_helper" "${trust_paths[@]}" \
     || echo "[splittasks-launch] WARN: trust pre-population failed; spawned sessions may show the 'trust this file' dialog" >&2
@@ -951,8 +966,10 @@ else
 fi
 
 # Pre-populate workspace-trust for the lane's worktree. WARN on failure; do not abort.
-if [ -f "$HOME/.claude/skills/splittasks/claude-trust-paths.sh" ]; then
-  bash "$HOME/.claude/skills/splittasks/claude-trust-paths.sh" "$WORKTREE" \
+SKILL_DIR="<SKILL_DIR>"   # auto-launch rule 7; left unfilled -> the manual path
+[ -d "$SKILL_DIR" ] || SKILL_DIR="$HOME/.claude/skills/splittasks"
+if [ -f "$SKILL_DIR/claude-trust-paths.sh" ]; then
+  bash "$SKILL_DIR/claude-trust-paths.sh" "$WORKTREE" \
     || echo "[relaunch] WARN: trust pre-population failed; relaunched session may show the 'trust this file' dialog" >&2
 fi
 
@@ -1039,7 +1056,7 @@ Aborting after dispatch is per-window (close the tab or Ctrl-C inside it).
 
 ### Step 4 — Print the briefing
 
-Substitute `<SESSION_ID>` and `<ABS_SESSION_DIR>` with their literal values everywhere (the
+Substitute `<SESSION_ID>`, `<ABS_SESSION_DIR>` and `<SKILL_DIR>` with their literal values everywhere (the
 boxes are informational — the agent launches — but the manual fallback line must be pasteable
 as-is, with nothing for the owner to fill in). Each box is 63 columns wide; use the exact
 Unicode glyphs `╭ ╮ ╰ ╯ ─ │ · → ▶` (no ASCII substitutes). Drop the T4/T3 box if not assigned.

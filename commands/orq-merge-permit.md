@@ -5,18 +5,23 @@ description: Grants or revokes the permit for the orchestrator to run git merge 
 
 The owner asked to grant (or revoke) the MERGE permit. Do EXACTLY this, without explaining anything first:
 
-1. From the root of the orchestrated repo, run (the script lives at
-   `~/.claude/skills/orq/scripts/orchestrator-control.js`; if the skill is installed somewhere else,
-   use the folder where this skill's `SKILL.md` is — e.g. `$CLAUDE_CONFIG_DIR/skills/orq/`):
+1. From the root of the orchestrated repo, run, both lines in ONE command (the first one finds the
+   skill: as a plugin, Claude Code fills `${CLAUDE_PLUGIN_ROOT}` in with the plugin's absolute folder;
+   installed by hand that variable is empty in the shell, so `$ORQ` is `~/.claude/skills/orq`, or the one
+   under `$CLAUDE_CONFIG_DIR`; only an absolute folder holding the skill's script is taken (`/…`, or
+   `C:/…` under Git Bash), nothing relative to the repo is probed; the shell forgets `$ORQ` between commands, so the line goes in front
+   of every `node` below):
 
 ```
-node ~/.claude/skills/orq/scripts/orchestrator-control.js allow-git --scope merge --order-from-owner "<hh:mm and the owner's literal words>"
+ORQ="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/orq"; P="${CLAUDE_PLUGIN_ROOT}"; case "$P" in /*) ;; [A-Za-z]:/*) case "$OSTYPE" in msys*|cygwin*) ;; *) P=;; esac;; *) P=;; esac; [ -n "$P" ] && [ -f "$P/scripts/orchestrator-control.js" ] && ORQ="$P"
+node "$ORQ/scripts/orchestrator-control.js" allow-git --scope merge --order-from-owner "<hh:mm and the owner's literal words>"
 ```
 
    If what the owner typed carries `--revoke`, run this instead (without `--order-from-owner`, revoking doesn't need it):
 
 ```
-node ~/.claude/skills/orq/scripts/orchestrator-control.js allow-git --scope merge --revoke
+ORQ="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/orq"; P="${CLAUDE_PLUGIN_ROOT}"; case "$P" in /*) ;; [A-Za-z]:/*) case "$OSTYPE" in msys*|cygwin*) ;; *) P=;; esac;; *) P=;; esac; [ -n "$P" ] && [ -f "$P/scripts/orchestrator-control.js" ] && ORQ="$P"
+node "$ORQ/scripts/orchestrator-control.js" allow-git --scope merge --revoke
 ```
 
 2. This permit authorizes the orchestrator to run `git merge` and `gh pr merge`. It is different from the
@@ -47,7 +52,8 @@ node ~/.claude/skills/orq/scripts/orchestrator-control.js allow-git --scope merg
 5. Show the owner that they can run:
 
 ```
-node ~/.claude/skills/orq/scripts/orchestrator-control.js status
+ORQ="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/orq"; P="${CLAUDE_PLUGIN_ROOT}"; case "$P" in /*) ;; [A-Za-z]:/*) case "$OSTYPE" in msys*|cygwin*) ;; *) P=;; esac;; *) P=;; esac; [ -n "$P" ] && [ -f "$P/scripts/orchestrator-control.js" ] && ORQ="$P"
+node "$ORQ/scripts/orchestrator-control.js" status
 ```
 
    and show them the permit lines that come out there. Answer in 3 lines at most.

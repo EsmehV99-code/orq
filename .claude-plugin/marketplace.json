@@ -1,0 +1,51 @@
+{
+  "name": "orq",
+  "owner": { "name": "EsmehV99-code", "url": "https://github.com/EsmehV99-code" },
+  "description": "orq — run several Claude Code terminals in parallel, and trust what they hand back.",
+  "plugins": [
+    {
+      "name": "orq",
+      "source": ".",
+      "version": "1.2.0",
+      "description": "Turns one terminal into the orchestrator of several Claude Code terminals or subagents: it hands each lane a complete brief, validates every receipt before reading its prose, and 12 hooks watch the classic failures (an unverified \"0 results\", a wait with no deadline, a merge without permission, an orchestrator that starts editing code). Bundles /splittasks (Windows and macOS variants).",
+      "author": { "name": "EsmehV99-code", "url": "https://github.com/EsmehV99-code" },
+      "homepage": "https://github.com/EsmehV99-code/orq",
+      "repository": "https://github.com/EsmehV99-code/orq",
+      "license": "MIT",
+      "keywords": ["orchestration", "multi-agent", "parallel", "hooks", "claude-code", "windows", "macos"],
+      "category": "productivity",
+      "metadata": {
+        "note": "This file is both the marketplace and the plugin's manifest. There is NO .claude-plugin/plugin.json on purpose: with one, a plain clone into ~/.claude/skills/orq would ALSO load as a plugin and the 12 hooks would run twice (once from here, once from settings.json). The hooks below are the same 12 plugs as PLUGS in scripts/install.js and install/hooks-orchestrator.example.json; tests/test-structure.mjs checks the three agree. Bump `version` together with SKILL.md on every release: users stay on the cached copy until the string changes."
+      },
+      "skills": [".", "./skills"],
+      "hooks": {
+        "PreToolUse": [
+          { "matcher": "Skill|Agent|Task|TaskCreate|TaskUpdate", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] },
+          { "matcher": "Write|Edit", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] },
+          { "matcher": "Bash|PowerShell", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] }
+        ],
+        "PostToolUse": [
+          { "matcher": "Bash|PowerShell", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] },
+          { "matcher": "Write|Edit", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] },
+          { "matcher": "Agent|Task", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] },
+          { "matcher": "Read|Grep|Glob", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] }
+        ],
+        "Stop": [
+          { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 20 }] }
+        ],
+        "SubagentStop": [
+          { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 15 }] }
+        ],
+        "PreCompact": [
+          { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 15 }] }
+        ],
+        "SessionStart": [
+          { "matcher": "compact", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 15 }] }
+        ],
+        "UserPromptSubmit": [
+          { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js\"", "timeout": 10 }] }
+        ]
+      }
+    }
+  ]
+}

@@ -5,7 +5,7 @@
 ![Platforms: Windows | macOS](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-lightgrey)
 ![Needs: Node.js](https://img.shields.io/badge/needs-Node.js-green)
 
-![The orq circuit: the owner invokes the skill; the orchestrator hands briefs to the lanes and verifies the receipts that come back; the hook warns it and watches every lane; only the orchestrator, with permission, merges to the main branch](docs/cover.svg)
+![Demo, recorded from the hook's real output: a receipt that claims "done" with no proof is rejected unread; the same receipt with its proofs passes](docs/demo.gif)
 
 A [Claude Code](https://claude.com/claude-code) skill that turns one terminal into an
 **orchestrator**: it splits a job into lanes, hands each lane to another terminal or subagent with
@@ -18,19 +18,19 @@ least contact with the truth. If it only routes messages, it amplifies every "do
 failures: an unverified "0 results", a wait with no deadline, a merge without permission, an
 orchestrator that starts editing code itself.
 
-**Quick start** (needs `git` and `node`):
+![The orq circuit: the owner invokes the skill; the orchestrator hands briefs to the lanes and verifies the receipts that come back; the hook warns it and watches every lane; only the orchestrator, with permission, merges to the main branch](docs/cover.svg)
+
+**Quick start — as a plugin** (one line, inside Claude Code; needs `node`):
 
 ```
-git clone https://github.com/EsmehV99-code/orq ~/.claude/skills/orq
-node ~/.claude/skills/orq/scripts/install.js
+/plugin install orq --marketplace EsmehV99-code/orq
 ```
 
-Then, in a new Claude Code terminal inside a git repository, type `/orq`. The installer also puts
-the bundled **`/splittasks`** skill (splits a goal into parallel terminals and opens them) in the
-variant of your system — Windows or macOS. Details in [Installation](#installation).
-
-**Live map, with clicks:** open [`docs/map.html`](docs/map.html) (double click, no internet needed): the
-same drawing, and clicking each box shows its real wiring.
+Then, in a new terminal inside a git repository, type `/orq`. The plugin brings the 12 hooks, the
+commands (`/orq:dashboard`, `/orq:orq-git-permit`…) and the bundled **`/splittasks`** skill in both
+variants (`/orq:splittasks-windows`, `/orq:splittasks-macos`: it splits a goal into parallel
+terminals and opens them). **Or by hand** (`git clone … ~/.claude/skills/orq` + `install.js`): the
+same thing without the `orq:` prefix. One or the other, not both — [Installation](#installation).
 
 - **What it does:** starts on its own when loaded (`/orq`: that is the name of the skill, not a
   shortcut to another one), keeps its state on disk, watches memory and waits, brakes the
@@ -170,7 +170,7 @@ from its code. Without a subcommand, the script is the hook.
 | `review` | launches ONE read-only Codex round over the diff and records it | lane, orchestrator | `node ~/.claude/skills/orq/scripts/orchestrator-control.js review --lane T<n> --brief <path>` |
 | `cost` | the token board per lane; with `--lane` records what one spent | orchestrator | `node ~/.claude/skills/orq/scripts/orchestrator-control.js cost --lane T<n> --tokens <n>` |
 | `rule` | registers a decision of the owner so it gets watched (if not registered, nobody watches it) | orchestrator (owner session) | `node ~/.claude/skills/orq/scripts/orchestrator-control.js rule --text "<the rule, literal>" --doc <path>` |
-| `agents` | looks at which agents and commands of the skill are installed (read only) | anyone | `node ~/.claude/skills/orq/scripts/orchestrator-control.js agents` |
+| `agents` | looks at which agents and commands of the skill are installed (read only); as a plugin add `--plugin-root <plugin folder>` (commands are then served by the plugin, not installed) | anyone | `node ~/.claude/skills/orq/scripts/orchestrator-control.js agents` |
 | `baseline` | saves what was ALREADY broken before starting, so nobody chases someone else's red | lane, orchestrator | `node ~/.claude/skills/orq/scripts/orchestrator-control.js baseline --save --suite <name> --since <output file>` |
 
 Run any subcommand without arguments to see its own `usage:` text; the lines above are a summary.
@@ -192,7 +192,18 @@ Run any subcommand without arguments to see its own `usage:` text; the lines abo
 > **Tested on Windows. macOS is supported in the code but NOT TESTED on a real Mac yet** — see
 > "Platforms" below.
 
-**From scratch, on a new machine:**
+**As a plugin (recommended):** inside Claude Code, `/plugin install orq --marketplace EsmehV99-code/orq`
+(or from the shell: `claude plugin marketplace add EsmehV99-code/orq`, then
+`claude plugin install orq@orq`; `claude plugin update orq@orq` brings the next version). The plugin
+is declared in [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): the 12 hooks go
+with it, nothing is written into your `settings.json`, and Claude Code namespaces what it brings:
+`/orq` (also `/orq:orq`), `/orq:dashboard`, `/orq:orq-git-permit`, `/orq:orq-merge-permit`,
+`/orq:orq-batch-closed`, `/orq:splittasks-windows`, `/orq:splittasks-macos`. The hook accepts both
+spellings. As a plugin the skill copies only `agents/` to `~/.claude/agents/` (a brief names
+`lane-lead` bare); the commands are served by the plugin under their `/orq:` names and nothing else
+is written. Do not ALSO install by hand: that runs every hook twice.
+
+**By hand, from scratch:**
 
 1. **Clone** the repository into `~/.claude/skills/orq` (the folder must be called `orq`, like the
    `name:` in `SKILL.md`). You need `node`.
@@ -263,7 +274,7 @@ the old mark on READ, so the copies already installed can be updated.
   backup copy.
 - `~/.claude/agents/`: managed copy of `agents/` (mark `# managed-by: orq`).
 - `~/.claude/commands/`: managed copy of `commands/` (`dashboard.md`, `orq-git-permit.md`,
-  `orq-merge-permit.md`, `orq-batch-closed.md` and `orq-install.md`), with the same mark.
+  `orq-merge-permit.md`, `orq-batch-closed.md`, `orq-install.md`), same mark; not as a plugin.
 - `~/.claude/skills/splittasks/`: managed copy of `skills/splittasks-<your system>/`, with the same
   mark (put there by the installer only, not by the skill load).
 
@@ -272,8 +283,8 @@ Everything else lives inside this folder. In the repo being orchestrated, the le
 `.git/`; handovers, briefs and receipts live in `.orchestrator/` at the repo root.
 
 **The sync NEVER deletes anything that is installed.** It copies and updates what carries the mark,
-does not touch what does not, and never deletes. That is why an old file such as
-`~/.claude/commands/orq.md` stays until the owner (or the orchestrator) removes it by hand.
+does not touch what does not, and never deletes: an old `~/.claude/commands/orq.md`, or the 3 agents
+after `claude plugin uninstall orq@orq`, stay until the owner (or the orchestrator) removes them by hand.
 
 ## Platforms
 

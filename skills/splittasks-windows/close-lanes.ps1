@@ -3,7 +3,9 @@
 #
 # Uso (desde la sesión que lanzó LAUNCH.sh, cuando llega el aviso idle de T1 y T1-done.md existe,
 # o cuando la corrida se abandona):
-#   powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\you\.claude\skills\splittasks\close-lanes.ps1" -TitlePart "splittasks-<SESSION_ID>"
+#   powershell -NoProfile -ExecutionPolicy Bypass -File "<SKILL_DIR>\close-lanes.ps1" -TitlePart "splittasks-<SESSION_ID>"
+#   (<SKILL_DIR> = la carpeta de esta skill: C:\Users\you\.claude\skills\splittasks instalada a mano,
+#   <raíz del plugin>\skills\splittasks-windows como plugin de orq; regla 7 del auto-launch del SKILL.md)
 #
 # Códigos de salida: 0 = la ventana ya no existe · 1 = sigue abierta · 2 = el patrón coincide con
 # más ventanas que -MaxWindows (no se toca nada) · 3 = ninguna ventana coincide (con -IfExists → 0)

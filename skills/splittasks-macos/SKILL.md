@@ -1,16 +1,19 @@
 ---
 # managed-by: orq
-name: splittasks
-description: Split a complex goal into parallel terminal workstreams. Assigns each terminal a role and model (Sonnet/Opus/Haiku), writes handoff .md files to ./splits/ in the project root, and prints a briefing with exact commands to run in each terminal. (macOS variant; installed by orq's installer)
+name: splittasks-macos
+description: Split a complex goal into parallel terminal workstreams. Assigns each terminal a role and model (Sonnet/Opus/Haiku), writes handoff .md files to ./splits/ in the project root, and prints a briefing with exact commands to run in each terminal. (macOS variant. Installed by hand: orq's installer copies it to ~/.claude/skills/splittasks/, so /splittasks invokes it. As a plugin: /orq:splittasks-macos)
 triggers: ["/splittasks"]
 ---
 
 # /splittasks — Multi-Terminal Parallel Orchestration
 
 > **Platform variant: macOS** (Terminal.app via `osascript`). The Windows variant lives at
-> `skills/splittasks-windows/` in the orq repo. `node ~/.claude/skills/orq/scripts/install.js`
-> copies the right one for your OS to `~/.claude/skills/splittasks/`, so the command is always
-> `/splittasks`. This variant was written for macOS by a collaborator and has NOT been re-tested
+> `skills/splittasks-windows/` in the orq repo. Installed by hand, `node ~/.claude/skills/orq/scripts/install.js`
+> copies the right one for your OS to `~/.claude/skills/splittasks/`, so the command is `/splittasks`.
+> As the orq **plugin** nothing is copied: the skill is `/orq:splittasks-macos` and its files
+> (`claude-trust-paths.sh`) stay in `${CLAUDE_PLUGIN_ROOT}/skills/splittasks-macos/` (Claude Code
+> fills that variable in when it renders this skill; the templates call that folder `<SKILL_DIR>`).
+> This variant was written for macOS by a collaborator and has NOT been re-tested
 > for this release. It mentions a few helper tools of its author (`/audit-fix`, the factory
 > checks) that are not included; the core flow does not need them.
 
@@ -1031,7 +1034,7 @@ The exec path is a Terminal.app dispatch: `claude --model <id> --permission-mode
 
 ### LAUNCH.sh template
 
-The skill writer fills in the `<…>` placeholders + emits one `spawn …` line per lane in this order: ▶ workers first, then ⏸ downstream workers, then T1 last (with a 2s delay so its first poll observes workers spawning).
+The skill writer fills in the `<…>` placeholders + emits one `spawn …` line per lane in this order: ▶ workers first, then ⏸ downstream workers, then T1 last (with a 2s delay so its first poll observes workers spawning). `<SKILL_DIR>` is this skill's folder, where `claude-trust-paths.sh` lives: `$HOME/.claude/skills/splittasks` installed by hand, `${CLAUDE_PLUGIN_ROOT}/skills/splittasks-macos` as the orq plugin (Claude Code fills that variable in when it renders this skill; if you read it as a literal `${…}`, you are the manual install). Left unfilled, the templates fall back to the manual path.
 
 ```bash
 #!/usr/bin/env bash
@@ -1252,7 +1255,11 @@ if [ "${SHARED_CWD_MODE:-0}" != "1" ]; then
   for lane in $LANES; do
     trust_paths+=("$WT_ROOT/$lane")
   done
-  trust_helper="$HOME/.claude/skills/splittasks/claude-trust-paths.sh"
+  # <SKILL_DIR> = this skill's folder (`~/.claude/skills/splittasks` by hand,
+  # `<plugin root>/skills/splittasks-macos` as the orq plugin); unfilled -> the manual path.
+  SKILL_DIR="<SKILL_DIR>"
+  [ -d "$SKILL_DIR" ] || SKILL_DIR="$HOME/.claude/skills/splittasks"
+  trust_helper="$SKILL_DIR/claude-trust-paths.sh"
   trust_ok=1
   if [ -f "$trust_helper" ]; then
     if ! bash "$trust_helper" "${trust_paths[@]}"; then
@@ -1312,7 +1319,7 @@ Constraints the skill writer enforces while emitting LAUNCH.sh:
   ```
 - **Emit the LANE_REGISTRY placeholder substitution** — see the `LANE_REGISTRY_PLACEHOLDER` comment block in the template for the exact shape (bash 3.2: a `LANES="…"` string + `lane_model()` and `lane_role()` case functions). Order in `LANES` matches spawn order. Without this, the worktree-setup loop has nothing to iterate.
 - **Spawn cwd MUST be the worktree.** The template's `spawn()` already resolves `cwd="$WT_ROOT/T${n}"` — do not hand-edit `cd $PROJECT_ROOT` back in. The whole point of this template is that lanes start in their isolated worktree.
-- **Pre-populate workspace-trust before the spawn loop.** The template includes a block that invokes `~/.claude/skills/splittasks/claude-trust-paths.sh` (bundled with this skill) on every lane's worktree path AFTER worktree setup completes and BEFORE the `osascript` activate. Without this, every spawned worker (whatever its permission mode) stalls on Claude Code's separate workspace-trust dialog ("Do you trust the files in this folder?") on first entry to a never-seen directory. Worktree paths are fresh every session → every session hits the dialog without this pre-population. Failure of the helper is a WARN, not an abort. Skipped entirely in `SHARED_CWD_MODE=1` since the cwd is `$PROJECT_ROOT` which is usually already trusted. **If a future revision drops this block, the trust-dialog regression returns.**
+- **Pre-populate workspace-trust before the spawn loop.** The template includes a block that invokes `<SKILL_DIR>/claude-trust-paths.sh` (bundled with this skill, next to this file) on every lane's worktree path AFTER worktree setup completes and BEFORE the `osascript` activate. Without this, every spawned worker (whatever its permission mode) stalls on Claude Code's separate workspace-trust dialog ("Do you trust the files in this folder?") on first entry to a never-seen directory. Worktree paths are fresh every session → every session hits the dialog without this pre-population. Failure of the helper is a WARN, not an abort. Skipped entirely in `SHARED_CWD_MODE=1` since the cwd is `$PROJECT_ROOT` which is usually already trusted. **If a future revision drops this block, the trust-dialog regression returns.**
 
 ### Per-lane RELAUNCH scripts (one per lane)
 
@@ -1393,8 +1400,10 @@ applescript_quote() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
 # Pre-populate workspace-trust for the lane's worktree so the relaunched
 # `claude` session skips the "trust this file" dialog. Same rationale as
 # LAUNCH.sh's pre-spawn block. WARN on failure; do not abort.
-if [ "${SHARED_CWD_MODE:-0}" != "1" ] && [ -f "$HOME/.claude/skills/splittasks/claude-trust-paths.sh" ]; then
-  bash "$HOME/.claude/skills/splittasks/claude-trust-paths.sh" "$WORKTREE" \
+SKILL_DIR="<SKILL_DIR>"   # this skill's folder (see the LAUNCH.sh template); unfilled -> the manual path
+[ -d "$SKILL_DIR" ] || SKILL_DIR="$HOME/.claude/skills/splittasks"
+if [ "${SHARED_CWD_MODE:-0}" != "1" ] && [ -f "$SKILL_DIR/claude-trust-paths.sh" ]; then
+  bash "$SKILL_DIR/claude-trust-paths.sh" "$WORKTREE" \
     || echo "[relaunch] WARN: trust pre-population failed; relaunched session may show the 'trust this file' dialog" >&2
 fi
 

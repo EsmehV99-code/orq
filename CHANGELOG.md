@@ -2,6 +2,14 @@
 
 What you will notice in each release, in plain words, written for the person who uses the skill.
 
+## 1.2.0 — 2026-10-14 — install it as a plugin, in one line
+
+- **One-line install:** `/plugin install orq --marketplace EsmehV99-code/orq` (inside Claude Code), or from the shell `claude plugin marketplace add EsmehV99-code/orq` and `claude plugin install orq@orq`. No clone, no `settings.json` surgery: the 12 hooks travel inside the plugin, and `claude plugin update orq@orq` brings the next version. The manual install (clone + `install.js`) still works exactly as before; pick one, not both.
+- **Names with a prefix, as a plugin:** Claude Code namespaces everything a plugin brings, so the skill is `/orq:orq`, the commands `/orq:dashboard`, `/orq:orq-git-permit`, `/orq:orq-merge-permit`, `/orq:orq-batch-closed`, and the bundled skills `/orq:splittasks-windows` and `/orq:splittasks-macos`. The bare names also work unless a command of yours already uses them. The hook recognizes both spellings (a typed `/orq:orq` starts the orchestration; `/orq:orq-git-permit` grants the permit).
+- **As a plugin, nothing of yours is overwritten and only 3 files are written:** the skill copies its 3 agents to `~/.claude/agents/` (a brief names `lane-lead` bare); the commands are served by the plugin itself and are not copied, and their `node` lines find the script in both installs (`$ORQ`). After `claude plugin uninstall orq@orq` those 3 agent files (with the mark) are what is left to remove by hand.
+- **The two `/splittasks` variants are now named after their folder** (`splittasks-windows`, `splittasks-macos`): two skills of one plugin cannot share a name. Installed by hand nothing changes for you: the installer still copies the right one to `~/.claude/skills/splittasks/`, and the folder name is what `/splittasks` invokes. As a plugin nothing is copied: their launch scripts take `claude-trust-paths.sh` (and `close-lanes.ps1` on Windows) from the plugin's folder through the new `<SKILL_DIR>` placeholder, which falls back to `~/.claude/skills/splittasks/` when left unfilled.
+- **A demo you can watch:** `docs/demo.gif` at the top of the README, recorded from the hook's real output: a receipt that claims "done" with no proof is rejected unread, the same receipt with its proofs passes.
+
 ## 1.1.0 — 2026-10-13 — `/splittasks` comes bundled
 
 - `/splittasks` — splits a goal into parallel terminal workstreams, writes one handoff file per lane and opens the terminals itself · now ships inside orq, so one install gives you both.
