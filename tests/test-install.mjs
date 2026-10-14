@@ -500,15 +500,21 @@ untouched('a number that would not survive rewriting', '{"x": 1e400}', 'number t
   const fileHasMark = (n, text) => /\.md$/i.test(n)
     ? /^---\r?\n[\s\S]*?\r?\n---/.test(text) && text.slice(0, 4096).includes(MARK)
     : (text.split(/\r?\n/).find((l) => l.trim() !== '') || '').trim() === MARK;
-  // POSITIVE CONTROL: both variants exist in the skill, each with a SKILL.md named `splittasks` and marked.
+  // POSITIVE CONTROL: both variants exist in the skill, each with a SKILL.md named after ITS FOLDER
+  // (`splittasks-windows` / `splittasks-macos`, since 1.2.0: two skills of one plugin cannot share a
+  // name) and marked. Installed by hand the folder is `~/.claude/skills/splittasks/`, and the folder
+  // name also invokes a skill, so `/splittasks` keeps working there.
   for (const v of ['splittasks-windows', 'splittasks-macos']) {
     const md = bytes(path.join(SKILL, 'skills', v, 'SKILL.md'));
-    assertOk(`(s) the skill carries skills/${v}/SKILL.md with name: splittasks and the mark in its header`,
-      md !== null && /^name:\s*splittasks\s*$/m.test(md.toString('utf8')) && fileHasMark('SKILL.md', md.toString('utf8')), md ? md.toString('utf8').slice(0, 200) : 'missing');
-    // The trust helper both SKILL.md call (`bash "$HOME/.claude/skills/splittasks/claude-trust-paths.sh"`) travels with each variant, marked.
+    assertOk(`(s) the skill carries skills/${v}/SKILL.md with name: ${v} and the mark in its header`,
+      md !== null && new RegExp(`^name:\\s*${v}\\s*$`, 'm').test(md.toString('utf8')) && fileHasMark('SKILL.md', md.toString('utf8')), md ? md.toString('utf8').slice(0, 200) : 'missing');
+    // The trust helper both SKILL.md call (`bash "$SKILL_DIR/claude-trust-paths.sh"`, where `$SKILL_DIR`
+    // falls back to `$HOME/.claude/skills/splittasks` by hand — 1.2.0) travels with each variant, marked.
     const sh = bytes(path.join(SKILL, 'skills', v, 'claude-trust-paths.sh'));
     assertOk(`(s) the skill carries skills/${v}/claude-trust-paths.sh with the mark on its first line`,
-      sh !== null && fileHasMark('claude-trust-paths.sh', sh.toString('utf8')) && md !== null && md.toString('utf8').includes('skills/splittasks/claude-trust-paths.sh'),
+      sh !== null && fileHasMark('claude-trust-paths.sh', sh.toString('utf8')) && md !== null &&
+      md.toString('utf8').includes('"$SKILL_DIR/claude-trust-paths.sh"') &&
+      md.toString('utf8').includes('SKILL_DIR="$HOME/.claude/skills/splittasks"'),
       sh ? sh.toString('utf8').slice(0, 80) : 'missing');
   }
   const d = conf();

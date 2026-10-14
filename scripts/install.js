@@ -240,9 +240,12 @@ function writeAtomic(file, text, mode) {
 /* ------------------------------------------------- the bundled skill: splittasks */
 
 // `skills/splittasks-<platform>/` is copied WHOLE to `<config>/skills/splittasks/`, so that
-// `/splittasks` exists on both systems with the variant that fits. Claude Code only sees
-// `~/.claude/skills/<name>/SKILL.md` (a skill nested inside the orq folder is not a skill),
-// which is why it is copied out. Same rules as agents and commands: every file carries the
+// `/splittasks` exists on both systems with the variant that fits. INSTALLED BY HAND Claude
+// Code only sees `~/.claude/skills/<name>/SKILL.md` (a skill nested inside the orq folder is
+// not a personal skill), which is why it is copied out. As a PLUGIN (1.2.0) this installer
+// does not run: `.claude-plugin/marketplace.json` lists `./skills`, so both variants load in
+// place as `/orq:splittasks-windows` and `/orq:splittasks-macos`, nothing copied.
+// Same rules as agents and commands: every file carries the
 // mark (`# managed-by: orq`: for a `.md` file, in its header as `hasSkillMark` reads it — the
 // frontmatter or the first body line, the old mark accepted on read; for any other file, its
 // first non-empty line), a file of yours without the mark is never touched, and nothing is

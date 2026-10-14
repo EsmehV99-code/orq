@@ -1327,9 +1327,11 @@ function noteReceipt(L, abs, input, cwd) {
   // count as "written now". (Codex r2 T21, medium.) ACCEPTED LIMIT: a `cp -p`
   // that keeps an old timestamp is not recorded.
   if (!st || !st.isFile() || st.mtimeMs < Date.now() - RECENT_RECEIPT_MS || st.mtimeMs > Date.now() + 60000) return false;
-  const norm = (p) => (p === null ? null : (CASE_INSENSITIVE_FS ? path.resolve(p).toLowerCase() : path.resolve(p)));
-  const receiptGit = norm(gitCommonDir(path.dirname(abs)));
-  if (receiptGit === null || receiptGit !== norm(gitCommonDir(cwdUsable(cwd)))) return false;
+  // `sameFolder`: the REAL folder. A worktree's `.git` file names the common dir
+  // the way git writes it (real path), the cwd the way the terminal was opened.
+  const receiptGit = gitCommonDir(path.dirname(abs));
+  const cwdGit = gitCommonDir(cwdUsable(cwd));
+  if (receiptGit === null || cwdGit === null || !sameFolder(receiptGit, cwdGit)) return false;
   const sid = (input && typeof input.session_id === 'string' && input.session_id.trim()) ? input.session_id.trim() : null;
   const keyOf = (p) => (CASE_INSENSITIVE_FS ? p.toLowerCase() : p);
   L.receipts_written = receiptsWritten(L).filter((r) => keyOf(r.path) !== keyOf(abs));
@@ -1366,8 +1368,11 @@ function isProductCode(f, cwd) {
   const ofFile = gitCommonDir(path.dirname(abs));
   const ofRepo = gitCommonDir(cwd);
   if (ofFile === null || ofRepo === null) return false;
-  const norm = (p) => (CASE_INSENSITIVE_FS ? path.resolve(p).toLowerCase() : path.resolve(p));
-  return norm(ofFile) === norm(ofRepo);
+  // The REAL folder, not the textual one: in a worktree the `.git` file carries the
+  // common dir as git writes it (real path: `/private/var/...`, `runneradmin`),
+  // while the main cwd comes as the terminal was opened (`/var/...`, `RUNNER~1`).
+  // Compared textually, the orchestrator touching a lane's worktree went quiet.
+  return sameFolder(ofFile, ofRepo);
 }
 
 /** Is the command being launched INSIDE the orchestrated repository? That is what
@@ -1507,7 +1512,7 @@ const MAX_HUMAN_ORDERS = 10;
 function permitCommandInPrompt(prompt) {
   const t = String(prompt || '').trim();
   if (!t || t.charCodeAt(0) !== 47 /* '/' */) return null;   // cheapest possible exit
-  const line = t.split('\n', 1)[0].trim().toLowerCase();
+  const line = stripPluginPrefix(t.split('\n', 1)[0].trim().toLowerCase());   // `/orq:orq-git-permit` (plugin) counts too
   for (const scope of GIT_SCOPES) {
     const c = SCOPE_COMMAND[scope];
     if (line === c || line.startsWith(c + ' ')) {
@@ -1705,11 +1710,49 @@ function mdPathsInText(text) {
   return out;
 }
 
-/** Equality of ABSOLUTE paths (on Windows, case-insensitive). */
+/** The REAL absolute path of `p`: links, junctions, the macOS `/var` → `/private/var`
+ *  alias and the Windows 8.3 short names (`RUNNER~1`) undone. It works even if the
+ *  LAST pieces do not exist yet or have just been deleted: the nearest existing
+ *  ancestor is resolved and the rest is appended. If nothing on disk cooperates,
+ *  the textual `path.resolve` is returned — this never fails.
+ *
+ *  It exists because `path.resolve` left a gap on the CI runners: the test builds
+ *  a path under `$TMPDIR` (textual) and the hook gets the same folder through
+ *  `process.cwd()`, `git` or `realpathSync.native` (real); the two are the same
+ *  file and did not match. (`.native`, not the JS `realpathSync`: only the native
+ *  one expands the Windows short names.) */
+function realPathOf(p) {
+  let abs;
+  try { abs = path.resolve(String(p)); } catch (_) { return null; }
+  let head = abs;
+  const tail = [];
+  for (let i = 0; i < 256; i++) {
+    try {
+      const real = fs.realpathSync.native(head);
+      return tail.length ? path.join(real, ...tail.slice().reverse()) : real;
+    } catch (_) { /* it does not exist (yet, or any more): go up */ }
+    const parent = path.dirname(head);
+    if (parent === head) break;
+    tail.push(path.basename(head));
+    head = parent;
+  }
+  return abs;
+}
+
+/** The KEY of a path for a `Set`/`Map`: its real path, lowercased where the disk
+ *  does not tell case apart. What is looked up with it has to be put in with it. */
+function keyOfPath(p) {
+  const r = String(realPathOf(p));
+  return CASE_INSENSITIVE_FS ? r.toLowerCase() : r;
+}
+
+/** Equality of ABSOLUTE paths (on Windows, case-insensitive). The REAL path is
+ *  compared: a brief written down as `/var/...` and found on disk as
+ *  `/private/var/...` is the same brief. */
 function sameAbsPath(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
   const norm = (p) => {
-    const r = path.resolve(p).replace(/[\\/]+$/, '');
+    const r = String(realPathOf(p)).replace(/[\\/]+$/, '');
     return CASE_INSENSITIVE_FS ? r.toLowerCase() : r;
   };
   try { return norm(a) === norm(b); } catch (_) { return false; }
@@ -3443,8 +3486,7 @@ function checkSpecOnEdit(L, p, cwd, f) {
   const ofFile = gitCommonDir(path.dirname(abs));
   const ofRepo = gitCommonDir(cwd);
   if (ofFile === null || ofRepo === null) return null;
-  const norm = (x) => (CASE_INSENSITIVE_FS ? path.resolve(x).toLowerCase() : path.resolve(x));
-  if (norm(ofFile) !== norm(ofRepo)) return null;
+  if (!sameFolder(ofFile, ofRepo)) return null;   // the REAL folder, as in `isProductCode`
   const rel = normalizeRelPath(path.relative(root, abs));
   if (!rel) return null;
   if (!L.specs_pending || typeof L.specs_pending !== 'object') L.specs_pending = {};
@@ -4548,10 +4590,12 @@ function sameFolder(a, b) {
   // by an alias and the event's `cwd` carries the real path, they are the same and
   // the gate went quiet (Codex, 2026-09-15). The real path is attempted and, if
   // disk does not cooperate, the textual one is compared — this never fails.
+  // Through `realPathOf`, so a folder that does NOT exist yet still gets its
+  // existing ancestors resolved (`/var/…/new` and `/private/var/…/new` are the
+  // same folder on macOS before it is created). (Codex, round 7, MEDIUM.)
   const n = (p) => {
-    let r;
-    try { r = path.resolve(String(p)); } catch (_) { return null; }
-    try { r = fs.realpathSync.native(r); } catch (_) { /* it does not exist or no permission: the textual one will do */ }
+    const r = realPathOf(p);
+    if (r === null) return null;
     return CASE_INSENSITIVE_FS ? r.toLowerCase() : r;
   };
   const x = n(a), y = n(b);
@@ -4729,17 +4773,39 @@ function migrateOldHandovers(L, ledgerFilePath) {
     if (Date.now() > DEADLINE) break;
     const source = path.join(old, n);
     // `lstat`: a link in the old folder is neither moved nor followed.
-    try { if (!fs.lstatSync(source).isFile()) continue; } catch (_) { continue; }
+    let st;
+    try { st = fs.lstatSync(source); if (!st.isFile()) continue; } catch (_) { continue; }
     const dest = path.join(target, n);
     try {
       // COPYFILE_EXCL fails if the target already exists — without the gap between
       // `existsSync` and the write, which is where another terminal could slip in.
       fs.copyFileSync(source, dest, fs.constants.COPYFILE_EXCL);
+      // A MOVE keeps the date. The copy does not on macOS/Linux (Windows does):
+      // without this, a 40-day-old handover came out of the migration born today
+      // and the cleanup by age, right afterwards, no longer saw it as old.
+      // The date is re-read AFTER the copy: if another terminal rewrote the source
+      // in between, the copy carries the NEW content and must not be backdated with
+      // the old date (the cleanup would delete fresh content as "old"). A source that
+      // changed keeps the copy born today, which is the harmless side — and that is
+      // set EXPLICITLY, because on Windows the copy itself carries the source's date
+      // (Codex gpt-5.6-sol, rounds 7 and 8 of the CI-portability fix, MEDIUM).
+      let stable = false;
+      try {
+        const after = fs.lstatSync(source);
+        stable = after.isFile() && after.size === st.size && after.mtimeMs === st.mtimeMs;
+      } catch (_) { stable = false; }
+      try {
+        const now = new Date();
+        fs.utimesSync(dest, stable ? st.atime : now, stable ? st.mtime : now);
+      } catch (_) { /* the copy is there; its date is the least of it */ }
       // The original is only deleted AFTER the copy is complete: if something blows
       // up halfway, the worst that happens is that the handover exists twice.
       // Duplicated is fixed by looking; lost is not.
+      // The key is taken BEFORE the `unlink`, as the cleanup by age does: afterwards
+      // only the folder resolves (Codex gpt-5.6-sol r11, MEDIUM).
+      const sourceKey = keyOfPath(source);
       fs.unlinkSync(source);
-      renamed.set(source, dest);
+      renamed.set(sourceKey, dest);
       moved++;
     } catch (_) { clashed++; }
   }
@@ -4750,17 +4816,19 @@ function migrateOldHandovers(L, ledgerFilePath) {
   // delete it on this very startup — and the terminal that compacts receives the
   // path of a file that is no longer there.
   // (Codex gpt-5.6-sol, round 1 of T7, HIGH.)
+  // The lookups go by REAL path (`keyOfPath`): the ledger may carry the folder the
+  // way another terminal was opened, and that is still the same file.
   if (L && renamed.size) {
     if (Array.isArray(L.handovers)) {
       for (const t of L.handovers) {
-        if (t && typeof t === 'object' && renamed.has(t.path)) t.path = renamed.get(t.path);
+        if (t && typeof t === 'object' && typeof t.path === 'string' && renamed.has(keyOfPath(t.path))) t.path = renamed.get(keyOfPath(t.path));
       }
     }
     const ses = (L.sessions && typeof L.sessions === 'object') ? L.sessions : {};
     for (const s of Object.values(ses)) {
       if (!s || typeof s !== 'object') continue;
       for (const k of ['handover_written', 'handover_requested']) {
-        if (typeof s[k] === 'string' && renamed.has(s[k])) s[k] = renamed.get(s[k]);
+        if (typeof s[k] === 'string' && renamed.has(keyOfPath(s[k]))) s[k] = renamed.get(keyOfPath(s[k]));
       }
     }
   }
@@ -4986,11 +5054,14 @@ function cleanOldHandovers(L, ledgerFilePath) {
     const dir = containedFolder(handoversFolder(ledgerFilePath), handoversRoot(ledgerFilePath));
     if (dir === null) return;
     const cutoff = Date.now() - HANDOVER_STALE_MS;
-    const open = new Set(openHandovers(L).map((t) => t.path));
+    // By REAL path (`keyOfPath`): `dir` is already the real folder (`containedFolder`)
+    // and the ledger carries the textual one; compared as text, an OPEN handover
+    // under a `/var` alias or a Windows short name was deleted as nobody's.
+    const open = new Set(openHandovers(L).map((t) => keyOfPath(t.path)));
     for (const n of fs.readdirSync(dir)) {
       if (!n.startsWith('HANDOVER-')) continue;
       const p = path.join(dir, n);
-      if (open.has(p)) continue;                        // its terminal has not read it yet
+      if (open.has(keyOfPath(p))) continue;             // its terminal has not read it yet
       // `lstat`, not `stat`: a link with that name is neither followed nor deleted
       // by its target's date.
       try {
@@ -5083,7 +5154,7 @@ function handoversOfLabel(ledgerFilePath, label) {
  *  and the one being deleted was the one the session had written down.) */
 function handoversInUse(L) {
   const used = new Set();
-  const add = (v) => { if (typeof v === 'string' && v) used.add(CASE_INSENSITIVE_FS ? v.toLowerCase() : v); };
+  const add = (v) => { if (typeof v === 'string' && v) used.add(keyOfPath(v)); };   // real path, as `cleanLaneHandovers` looks it up
   for (const t of openHandovers(L)) add(t.path);
   const S = (L && L.sessions && typeof L.sessions === 'object' && !Array.isArray(L.sessions)) ? L.sessions : {};
   for (const sid of Object.keys(S)) {
@@ -5106,14 +5177,16 @@ function cleanLaneHandovers(L, ledgerFilePath, label, all) {
   // And NEVER what somebody has written down: the newest file by `mtime` may be a
   // just-seeded template, and the real one the previous.
   const inUse = handoversInUse(L);
-  const key = (p) => (CASE_INSENSITIVE_FS ? String(p).toLowerCase() : String(p));
-  const toDelete = candidates.filter((f) => !inUse.has(key(f.path)));
+  const toDelete = candidates.filter((f) => !inUse.has(keyOfPath(f.path)));
   const deleted = [];
+  const deletedKeys = new Set();
   for (const f of toDelete) {
-    try { fs.unlinkSync(f.path); deleted.push(f.path); } catch (_) { /* gone already */ }
+    // The key is taken BEFORE the `unlink`: afterwards only the folder resolves.
+    const k = keyOfPath(f.path);
+    try { fs.unlinkSync(f.path); deleted.push(f.path); deletedKeys.add(k); } catch (_) { /* gone already */ }
   }
   if (Array.isArray(L.handovers) && deleted.length) {
-    L.handovers = L.handovers.filter((t) => !(t && typeof t === 'object' && deleted.indexOf(t.path) >= 0));
+    L.handovers = L.handovers.filter((t) => !(t && typeof t === 'object' && typeof t.path === 'string' && deletedKeys.has(keyOfPath(t.path))));
   }
   if (deleted.length) {
     logLine(ledgerFilePath, `${iso()}\tINFO\tcleanup\t${label}\t${deleted.length} handover(s) deleted: ${deleted.map((b) => path.basename(b)).join(', ')}`);
@@ -10775,6 +10848,18 @@ const SKILL_NAME = 'orq';
 // the skill USES for everything else (mark, paths, doc) is `orq`.
 const OLD_SKILL_NAME = 'multi-terminal-orchestrator';
 
+/** THE PLUGIN PREFIX (1.2.0). Installed as a plugin (`.claude-plugin/marketplace.json`),
+ *  Claude Code namespaces every piece of the skill: the skill is `orq:orq` and the
+ *  commands are `/orq:orq-git-permit`, `/orq:dashboard`… The bare form keeps working
+ *  (documented: "the bare `/name` also invokes the skill unless another command already
+ *  uses that name"), so the owner may type either. Here the prefix is stripped from the
+ *  FIRST line and the comparisons that follow stay the ones measured for the plain install.
+ *  Cheap: one `startsWith` on a line that already starts with `/`. */
+const PLUGIN_PREFIX = '/' + SKILL_NAME + ':';
+function stripPluginPrefix(line) {
+  return line.startsWith(PLUGIN_PREFIX) ? '/' + line.slice(PLUGIN_PREFIX.length) : line;
+}
+
 /** Is this event the load of OUR skill?
  *
  *  Verified 2026-08-12 by capturing the real notice, not assuming it:
@@ -10785,7 +10870,8 @@ const OLD_SKILL_NAME = 'multi-terminal-orchestrator';
 function isSkillLoad(input) {
   if (String(input.tool_name || '') !== 'Skill') return false;
   const name = String((input.tool_input || {}).skill || '');
-  return name === SKILL_NAME || name === OLD_SKILL_NAME;
+  // `orq:orq` is the same skill loaded from the plugin (namespaced by Claude Code).
+  return name === SKILL_NAME || name === OLD_SKILL_NAME || name === SKILL_NAME + ':' + SKILL_NAME;
 }
 
 /** Is it a TYPED `/orq`? (T54, root cause of 10-01.) When the owner types `/orq`
@@ -10800,7 +10886,7 @@ function isTypedSkillLoad(input) {
   if (!input || typeof input.prompt !== 'string') return false;
   const t = input.prompt.trim();
   if (t.charCodeAt(0) !== 47 /* '/' */) return false;   // cheap exit: almost no prompt starts with '/'
-  const line = t.split('\n', 1)[0].trim();
+  const line = stripPluginPrefix(t.split('\n', 1)[0].trim());   // `/orq:orq` (plugin) counts as `/orq`
   if (line !== '/' + SKILL_NAME && !line.startsWith('/' + SKILL_NAME + ' ')) return false;
   return !isFromSubagent(input);
 }
@@ -11166,9 +11252,29 @@ function skillPartsLine(r, part) {
  *  `{ results: [{part, r}], line, notable }`. `line` is what hangs off the startup
  *  warning; `notable` says whether there is anything worth reporting even if the
  *  program was already running. (T10, 2026-09-17.) */
+/** Does THIS copy of the skill run as the Claude Code PLUGIN (1.2.0)? The hook process
+ *  then carries `CLAUDE_PLUGIN_ROOT` (the docs export it to hook commands) and it is OUR
+ *  root. A manual clone whose session has the variable pointing at ANOTHER plugin is not it. */
+function runningAsPlugin() {
+  const root = process.env.CLAUDE_PLUGIN_ROOT;
+  return typeof root === 'string' && root !== '' && sameAbsPath(root, SKILL_ROOT);
+}
+
+/** The folders synchronized on load. As a PLUGIN the commands are NOT copied: Claude Code
+ *  serves them itself as `/orq:<name>` from the plugin folder, where `${CLAUDE_PLUGIN_ROOT}`
+ *  gets filled in; a copy in `~/.claude/commands/` would be served WITHOUT that substitution
+ *  (its `node` lines would point at the manual path) and would outlive the uninstall (Codex
+ *  gpt-5.6-sol r10, MEDIUM). The agents ARE copied: a brief names `lane-lead` bare and the
+ *  Agent tool has to resolve it. */
+function partsToSync(asPlugin = runningAsPlugin()) {
+  return asPlugin ? SKILL_PARTS.filter((part) => part.sub !== 'commands') : SKILL_PARTS;
+}
+const PLUGIN_COMMANDS_LINE = ' · skill commands: served by the plugin as /orq:<name>, not copied.';
+
 function syncSkillPieces() {
-  const results = SKILL_PARTS.map((part) => ({ part, r: syncSkillParts(part.sub, part.title) }));
-  const line = results.map(({ part, r }) => skillPartsLine(r, part) || '').join('');
+  const results = partsToSync().map((part) => ({ part, r: syncSkillParts(part.sub, part.title) }));
+  const line = results.map(({ part, r }) => skillPartsLine(r, part) || '').join('') +
+    (runningAsPlugin() ? PLUGIN_COMMANDS_LINE : '');
   const notable = results.some(({ r }) => r && (r.copied || r.updated || r.foreign.length || r.error));
   return { results, line, notable };
 }
@@ -13606,9 +13712,13 @@ function cliMode(argv) {
             // false red that on top of that is impossible to fix without deleting the
             // very receipt being graded. (Reproduced by T7's lane lead while testing
             // this.)
-            const repoRoot = workRoot(cwd) || cwd;
+            // Both through `realPathOf`: `cwd` is what the process reports (on macOS
+            // the real `/private/var/...`), `--receipt` what the caller typed
+            // (`/var/...`); relativized as text, the receipt fell "outside" and
+            // accused itself again.
+            const repoRoot = realPathOf(workRoot(cwd) || cwd);
             for (const q of [receiptPath, briefArg]) {
-              const abs = path.resolve(cwd, q);
+              const abs = realPathOf(path.resolve(cwd, q));
               const rel = normalizeRelPath(path.relative(repoRoot, abs));
               if (rel) declared.add(rel);
             }
@@ -15281,9 +15391,21 @@ function cliMode(argv) {
   // `agents` is kept out of habit and because it is already written in the docs.
   if (sub === 'agents') {
     let exitCode = 0;
+    // As the plugin the HOOK process carries `CLAUDE_PLUGIN_ROOT`, but the Bash tool does not
+    // (docs: the variable is not in the environment of commands Claude runs), so whoever runs
+    // this by hand as the plugin passes `--plugin-root <plugin folder>`. Either way it has to
+    // be OUR root, or it is ignored (Codex gpt-5.6-sol r11, MEDIUM).
+    const pluginRootArg = arg(argv, 'plugin-root', null);
+    const asPlugin = runningAsPlugin() ||
+      (typeof pluginRootArg === 'string' && pluginRootArg !== '' && sameAbsPath(pluginRootArg, SKILL_ROOT));
     for (const part of SKILL_PARTS) {
       const source = skillFolder(part.sub);
       const target = skillTargetFolder(part.sub);
+      if (asPlugin && !partsToSync(asPlugin).includes(part)) {
+        // Nothing to compare: as a plugin the commands are never installed there (see `partsToSync`).
+        process.stdout.write(`\nskill ${part.title}: ${source}\nserved by the plugin as /orq:<name>; not installed in ${target}.\n`);
+        continue;
+      }
       let names = [];
       let error = null;
       try { names = fs.readdirSync(source).filter((n) => n.toLowerCase().endsWith('.md')).sort(); }

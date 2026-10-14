@@ -56,6 +56,7 @@ const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return 
 
 console.log('\nA. THE PIECES ARE WHERE THEY SAY THEY ARE');
 const PIECES = [
+  '.claude-plugin/marketplace.json',
   '.gitattributes',
   '.gitignore',
   'CHANGELOG.md',
@@ -209,6 +210,220 @@ assert('  ...and they are the SAME as the PLUGS of scripts/install.js (one singl
     red(exampleTxt.split('$HOME/.claude/skills/orq/scripts/orchestrator-control.js').join('/other/orchestrator-control.js')));
   assert('  MUTANT: a plug of a different `type` -> FAILS',
     red(hooksOf((h) => { h.Stop[0].hooks[0].type = 'prompt'; })));
+}
+
+// (3) The PLUGIN manifest (1.2.0). `.claude-plugin/marketplace.json` is both the marketplace and
+// the plugin's manifest — there is NO plugin.json on purpose: with one, a plain clone into
+// `~/.claude/skills/orq` would ALSO load as a plugin and every hook would run twice. Its inline
+// `hooks` are the SAME 12 plugs, each running `node "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js"`
+// (Claude Code fills the variable in), and its `version` is SKILL.md's: users stay on the cached
+// copy until that string changes.
+{
+  const mkTxt = read(`${SKILL}/.claude-plugin/marketplace.json`) || '';
+  let mk = null;
+  try { mk = JSON.parse(mkTxt); } catch { /* invalid */ }
+  assert('.claude-plugin/marketplace.json is valid JSON', mk !== null);
+  const entry = (mk && Array.isArray(mk.plugins) && mk.plugins.find((p) => p && p.name === 'orq')) || null;
+  assert('  ...it is the marketplace `orq` with ONE plugin `orq` whose source is the repo root (".")',
+    mk !== null && mk.name === 'orq' && mk.plugins.length === 1 && entry !== null && entry.source === '.');
+  const PLUGIN_CMD = 'node "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js"';
+  const commandsOf = (hooks) => {
+    const out = [];
+    for (const list of Object.values(hooks || {})) for (const g of list || []) for (const h of (g && g.hooks) || []) out.push(String((h && h.command) || ''));
+    return out;
+  };
+  // The plugin's command spelled as the installer's, so the SAME signature code compares both;
+  // only the exact plugin spelling is translated — anything else comes out as OTHER-SCRIPT.
+  const pluginSignatures = (e) => {
+    if (!e || !e.hooks || typeof e.hooks !== 'object' || Array.isArray(e.hooks)) return null;
+    const j = JSON.parse(JSON.stringify(e.hooks));
+    for (const list of Object.values(j)) for (const g of list || []) for (const h of (g && g.hooks) || []) {
+      if (h && h.command === PLUGIN_CMD) h.command = 'node "$HOME/.claude/skills/orq/scripts/orchestrator-control.js"';
+      else if (h) h.command = 'node "/other/orchestrator-control.js"';
+    }
+    return signaturesOf(j);
+  };
+  const sigPlugin = pluginSignatures(entry);
+  assert('  ...its inline `hooks` carry EXACTLY the 12 plugs, each running `node "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js"`',
+    sameList(sigPlugin, SIGNATURES_12) && commandsOf(entry && entry.hooks).every((c) => c === PLUGIN_CMD),
+    sigPlugin ? sigPlugin.join(' ; ') : 'hooks missing or not an object');
+  assert('  ...and they are the SAME as the PLUGS of scripts/install.js (one single truth, three copies)',
+    sameList(sigPlugin, plugsInstall));
+  const skillVersion = (/^version:\s*(\S+)\s*$/m.exec(skillMd) || [])[1] || '';
+  // ONE predicate for the real file and for its mutant below: a mutant that does not go
+  // through the same check proves nothing (Codex gpt-5.6-sol r10, LOW).
+  const versionOk = (e) => e !== null && typeof e === 'object' && skillVersion !== '' && e.version === skillVersion;
+  assert(`  ...its version (${entry && entry.version}) is SKILL.md's (${skillVersion})`, versionOk(entry));
+  assert('  ...there is NO .claude-plugin/plugin.json (it would turn the manual install into a second plugin: every hook twice)',
+    !fs.existsSync(`${SKILL}/.claude-plugin/plugin.json`));
+  assert('  ...the two bundled skills carry DISTINCT names, after their folder (two skills of one plugin cannot share one)',
+    ['splittasks-windows', 'splittasks-macos'].every((v) => new RegExp(`^name:\\s*${v}\\s*$`, 'm').test(read(`${SKILL}/skills/${v}/SKILL.md`) || '')));
+  const readmeTxt = read(`${SKILL}/README.md`) || '';
+  assert('  ...the README gives the one-line install and the prefixed names (`/orq:orq-git-permit`)',
+    readmeTxt.includes('/plugin install orq --marketplace EsmehV99-code/orq') && readmeTxt.includes('/orq:orq-git-permit'));
+  assert('  ...docs/demo.gif exists and the README shows it',
+    fs.existsSync(`${SKILL}/docs/demo.gif`) && readmeTxt.includes('docs/demo.gif'));
+  if (entry !== null && sigPlugin !== null) {
+    const mut = (f) => { const e = JSON.parse(JSON.stringify(entry)); f(e); return pluginSignatures(e); };
+    assert('  MUTANT: a hook running a path WITHOUT ${CLAUDE_PLUGIN_ROOT} -> FAILS',
+      !sameList(mut((e) => { e.hooks.Stop[0].hooks[0].command = 'node "$HOME/.claude/skills/orq/scripts/orchestrator-control.js"'; }), SIGNATURES_12));
+    assert('  MUTANT: the manifest without the UserPromptSubmit plug -> FAILS',
+      !sameList(mut((e) => { delete e.hooks.UserPromptSubmit; }), SIGNATURES_12));
+    assert('  MUTANT: a changed timeout (SubagentStop 15 -> 20) -> FAILS',
+      !sameList(mut((e) => { e.hooks.SubagentStop[0].hooks[0].timeout = 20; }), SIGNATURES_12));
+    assert('  MUTANT: the manifest with `version: 0.0.0` (not SKILL.md\'s) -> FAILS',
+      !versionOk({ ...entry, version: '0.0.0' }) && versionOk(entry));
+    assert('  MUTANT: the manifest with NO version -> FAILS',
+      !versionOk({ ...entry, version: undefined }));
+  }
+}
+
+// (3b) WHAT THE PLUGIN'S PIECES EXECUTE RESOLVES IN BOTH INSTALLS (Codex gpt-5.6-sol r10,
+// HIGH + MEDIUM). As a plugin nothing is copied to `~/.claude/skills/`, so a `node` line or a
+// helper path hardcoded at the manual path points at nothing. Two idioms, one per piece:
+//   · commands: `ORQ=<manual>; P="${CLAUDE_PLUGIN_ROOT}"; <keep P only if `/…`, or `X:/…` under
+//     msys/cygwin, else empty it>; [ -n "$P" ] && [ -f "$P/scripts/orchestrator-control.js" ] && ORQ="$P"`
+//     — Claude Code fills the variable in INSIDE the markdown of a plugin command (docs:
+//     "Skill, command, and agent content: anywhere in the Markdown body"), and never exports it
+//     to the Bash tool, so by hand the shell expands it to NOTHING and the manual path stays. Only
+//     an ABSOLUTE folder that holds the skill's script is taken (Codex r11, HIGH: a relative probe
+//     such as `[ -d '${CLAUDE_PLUGIN_ROOT}/scripts' ]` could be satisfied by a folder of that
+//     literal name planted in the orchestrated repo, and run ITS script; Codex r12, HIGH: a `?:*`
+//     pattern still let `C:relative` (drive-relative on Windows) and `x:/path` (relative on POSIX)
+//     through, so the drive form is accepted ONLY under Git Bash/Cygwin, by `$OSTYPE`);
+//   · splittasks templates: `SKILL_DIR="<SKILL_DIR>"` + fallback to the manual path, the
+//     placeholder filled by rule 7 like `<SESSION_ID>`.
+// Both are RUN here under a real bash (Git Bash on Windows; `bash` on PATH there is WSL's, so
+// it is never used), in the two states each one can be in.
+{
+  const ORQ_IDIOM = 'ORQ="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/orq"; P="${CLAUDE_PLUGIN_ROOT}"; case "$P" in /*) ;; [A-Za-z]:/*) case "$OSTYPE" in msys*|cygwin*) ;; *) P=;; esac;; *) P=;; esac; [ -n "$P" ] && [ -f "$P/scripts/orchestrator-control.js" ] && ORQ="$P"';
+  const MANUAL_NODE = /node\s+["']?(~|\$HOME)\/\.claude\/skills\/orq\/scripts\//;
+  const cmdFailures = (text) => {
+    const f = [];
+    if (!text.includes(ORQ_IDIOM)) f.push('the `ORQ=` idiom is missing');
+    if (MANUAL_NODE.test(text)) f.push('a `node` line still hardcodes the manual path');
+    const nodeLines = (text.match(/node\s+[^\n`]*?scripts\/[\w-]+\.js/g) || []);
+    if (!nodeLines.length) f.push('no `node …/scripts/*.js` line at all');
+    for (const l of nodeLines) if (!l.includes('"$ORQ/scripts/')) f.push(`not through $ORQ: ${l.slice(0, 60)}`);
+    return f;
+  };
+  for (const n of ['dashboard.md', 'orq-git-permit.md', 'orq-merge-permit.md', 'orq-batch-closed.md']) {
+    const fails = cmdFailures(read(`${SKILL}/commands/${n}`) || '');
+    assert(`commands/${n}: every \`node\` goes through \`$ORQ\`, found with the plugin-or-manual idiom`, fails.length === 0, fails.join('; '));
+  }
+  assert('  MUTANT: a command whose `node` line hardcodes `~/.claude/skills/orq/scripts/` -> FAILS',
+    cmdFailures(`${ORQ_IDIOM}\nnode ~/.claude/skills/orq/scripts/dashboard.js --open\n`).length > 0);
+  assert('  MUTANT: a command without the idiom -> FAILS',
+    cmdFailures('node "$ORQ/scripts/dashboard.js" --open\n').includes('the `ORQ=` idiom is missing'));
+
+  const SPLIT_IDIOM = ['SKILL_DIR="<SKILL_DIR>"', '[ -d "$SKILL_DIR" ] || SKILL_DIR="$HOME/.claude/skills/splittasks"'];
+  const HELPER_MANUAL = /\$HOME\/\.claude\/skills\/splittasks\/claude-trust-paths\.sh/;
+  for (const v of ['splittasks-windows', 'splittasks-macos']) {
+    const t = read(`${SKILL}/skills/${v}/SKILL.md`) || '';
+    const blocks = (t.match(/SKILL_DIR="<SKILL_DIR>"/g) || []).length;
+    assert(`skills/${v}/SKILL.md: LAUNCH.sh and RELAUNCH take claude-trust-paths.sh from \`$SKILL_DIR\` (placeholder + fallback), never from the manual path`,
+      blocks >= 2 && t.split(SPLIT_IDIOM[1]).length - 1 >= 2 && !HELPER_MANUAL.test(t) && t.includes('${CLAUDE_PLUGIN_ROOT}/skills/' + v),
+      `idiom x${blocks}; manual helper path: ${HELPER_MANUAL.test(t)}`);
+  }
+  assert('  ...and the Windows close helper is called from `<SKILL_DIR>` too (rule 6 and the header of close-lanes.ps1)',
+    (read(`${SKILL}/skills/splittasks-windows/SKILL.md`) || '').includes('-File "<SKILL_DIR>\\close-lanes.ps1"') &&
+    (read(`${SKILL}/skills/splittasks-windows/close-lanes.ps1`) || '').includes('-File "<SKILL_DIR>\\close-lanes.ps1"'));
+
+  // RUN UNDER BASH. `findBash` never returns WSL's `C:\Windows\System32\bash.exe`.
+  const findBash = () => {
+    const cands = process.platform === 'win32'
+      ? [path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'), 'C:\\Program Files\\Git\\bin\\bash.exe']
+      : ['/bin/bash', '/usr/bin/bash'];
+    return cands.find((c) => fs.existsSync(c)) || null;
+  };
+  const bash = findBash();
+  if (bash === null) {
+    skip('no bash found (Git Bash on Windows, /bin/bash elsewhere): the two idioms were not RUN, only read');
+  } else {
+    const { spawnSync } = await import('node:child_process');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orq-plugin-idiom-'));
+    const fwd = (p) => p.replace(/\\/g, '/');
+    // The plugin folder carries a SPACE and an APOSTROPHE on purpose (a user folder may).
+    const plugin = path.join(tmp, "plugin root o'hara"); fs.mkdirSync(path.join(plugin, 'scripts'), { recursive: true });
+    fs.writeFileSync(path.join(plugin, 'scripts', 'orchestrator-control.js'), '// toy\n');
+    fs.mkdirSync(path.join(plugin, 'skills', 'splittasks-windows'), { recursive: true });
+    const home = path.join(tmp, 'home'); fs.mkdirSync(home, { recursive: true });
+    // Git Bash rewrites `$HOME` and other env paths into its POSIX form (`C:/Users/…/Temp/x` ->
+    // `/tmp/x`), so a path that came in through the ENVIRONMENT is compared INSIDE bash
+    // (`[ "$ORQ" = "$HOME/…" ]`), and only a literal that never went through the env is
+    // compared here as text.
+    const run = (script, extra = {}) => {
+      const r = spawnSync(bash, ['--noprofile', '--norc', '-c', script], {
+        encoding: 'utf8', windowsHide: true, timeout: 20000, cwd: extra.cwd || tmp,
+        env: { PATH: process.env.PATH || '', HOME: fwd(home), CLAUDE_CONFIG_DIR: '', CLAUDE_PLUGIN_ROOT: '', ...(extra.env || {}) },
+      });
+      return { out: (r.stdout || '').trim(), code: r.status, err: (r.stderr || '').trim() };
+    };
+    const same = (v, expected) => `; if [ "${v}" = "${expected}" ]; then echo SAME; else echo "DIFFERENT: ${v}"; fi`;
+    // Commands: (a) rendered as a plugin command (Claude Code substituted the variable) -> the plugin folder.
+    const asPlugin = run(ORQ_IDIOM.split('${CLAUDE_PLUGIN_ROOT}').join(fwd(plugin)) + '; echo "$ORQ"');
+    assert('  RUN: the `ORQ=` idiom with `${CLAUDE_PLUGIN_ROOT}` filled in (a plugin command; folder with a space and an apostrophe) resolves to the plugin folder',
+      asPlugin.code === 0 && asPlugin.out === fwd(plugin), `${asPlugin.code} ${asPlugin.out} ${asPlugin.err}`.slice(0, 200));
+    // (a2) HOSTILE REPO (Codex r11, HIGH): a folder literally called `${CLAUDE_PLUGIN_ROOT}` planted
+    // in the cwd, with the script inside, must NOT be taken by the hand-rendered command.
+    const hostile = path.join(tmp, 'hostile-repo', '${CLAUDE_PLUGIN_ROOT}', 'scripts');
+    fs.mkdirSync(hostile, { recursive: true }); fs.writeFileSync(path.join(hostile, 'orchestrator-control.js'), '// planted\n');
+    const planted = run(ORQ_IDIOM + same('$ORQ', '$HOME/.claude/skills/orq'), { cwd: path.join(tmp, 'hostile-repo') });
+    assert('  RUN: a repo with a folder literally named `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator-control.js` in the cwd does NOT hijack the hand-rendered command (manual path kept)',
+      planted.code === 0 && planted.out === 'SAME', `${planted.code} ${planted.out} ${planted.err}`.slice(0, 200));
+    // (a3) a stray CLAUDE_PLUGIN_ROOT in the env pointing at a folder WITHOUT the skill's script -> manual.
+    const stray = run(ORQ_IDIOM + same('$ORQ', '$HOME/.claude/skills/orq'), { env: { CLAUDE_PLUGIN_ROOT: fwd(path.join(tmp, 'hostile-repo')) } });
+    assert('  RUN: `CLAUDE_PLUGIN_ROOT` in the env pointing at a folder with no `scripts/orchestrator-control.js` -> manual path kept',
+      stray.code === 0 && stray.out === 'SAME', `${stray.code} ${stray.out} ${stray.err}`.slice(0, 200));
+    // (a4) and a relative value (not absolute) is never taken, even if the folder exists.
+    const rel = run(ORQ_IDIOM + same('$ORQ', '$HOME/.claude/skills/orq'), { cwd: path.join(tmp, 'hostile-repo'), env: { CLAUDE_PLUGIN_ROOT: '${CLAUDE_PLUGIN_ROOT}' } });
+    assert('  RUN: a RELATIVE value is never taken, even when that relative folder exists in the cwd',
+      rel.code === 0 && rel.out === 'SAME', `${rel.code} ${rel.out} ${rel.err}`.slice(0, 200));
+    // (a5) Codex r12, HIGH: the drive forms that are NOT absolute. On Windows `C:relative` is
+    // drive-relative (= `<cwd on C:>/relative`); on POSIX `x:/path` is a plain relative path whose
+    // first segment is a folder called `x:` (a colon cannot be in a Windows file name, so that one
+    // is only planted on POSIX). Both must be refused with the folder and the script in the cwd.
+    const hostileRepo = path.join(tmp, 'hostile-repo');
+    fs.mkdirSync(path.join(hostileRepo, 'relative', 'scripts'), { recursive: true });
+    fs.writeFileSync(path.join(hostileRepo, 'relative', 'scripts', 'orchestrator-control.js'), '// planted\n');
+    const drive = /^[A-Za-z]:/.test(hostileRepo) ? hostileRepo.slice(0, 2) : 'C:';
+    const driveRel = run(ORQ_IDIOM + same('$ORQ', '$HOME/.claude/skills/orq'), { cwd: hostileRepo, env: { CLAUDE_PLUGIN_ROOT: drive + 'relative' } });
+    assert(`  RUN: a DRIVE-RELATIVE value (\`${drive}relative\`, folder and script present in the cwd) is never taken`,
+      driveRel.code === 0 && driveRel.out === 'SAME', `${driveRel.code} ${driveRel.out} ${driveRel.err}`.slice(0, 200));
+    if (process.platform === 'win32') {
+      skip('`x:/path` (a folder called `x:` in the cwd) cannot be planted on Windows: a colon is not a valid file-name character; the macOS/Linux run of this suite covers it');
+    } else {
+      fs.mkdirSync(path.join(hostileRepo, 'x:', 'path', 'scripts'), { recursive: true });
+      fs.writeFileSync(path.join(hostileRepo, 'x:', 'path', 'scripts', 'orchestrator-control.js'), '// planted\n');
+      const colonRel = run(ORQ_IDIOM + same('$ORQ', '$HOME/.claude/skills/orq'), { cwd: hostileRepo, env: { CLAUDE_PLUGIN_ROOT: 'x:/path' } });
+      assert('  RUN: on POSIX `x:/path` (a folder called `x:` planted in the cwd, script inside) is never taken',
+        colonRel.code === 0 && colonRel.out === 'SAME', `${colonRel.code} ${colonRel.out} ${colonRel.err}`.slice(0, 200));
+      // And a real Windows-looking absolute value is NOT accepted on POSIX either (the drive form is Git Bash only).
+      const driveOnPosix = run(ORQ_IDIOM + same('$ORQ', '$HOME/.claude/skills/orq'), { cwd: hostileRepo, env: { CLAUDE_PLUGIN_ROOT: 'C:/anything' } });
+      assert('  RUN: on POSIX a `C:/…` value is refused (that form only means absolute under Git Bash/Cygwin)',
+        driveOnPosix.code === 0 && driveOnPosix.out === 'SAME', driveOnPosix.out.slice(0, 200));
+    }
+    // (b) rendered by hand (the literal stays, the variable is NOT in the Bash tool's env) -> the manual path.
+    const byHand = run(ORQ_IDIOM + same('$ORQ', '$HOME/.claude/skills/orq'));
+    assert('  RUN: the same idiom with the literal `${CLAUDE_PLUGIN_ROOT}` (a command copied by hand) resolves to $HOME/.claude/skills/orq',
+      byHand.code === 0 && byHand.out === 'SAME', `${byHand.code} ${byHand.out} ${byHand.err}`.slice(0, 200));
+    // (c) and `CLAUDE_CONFIG_DIR`, when set, wins over $HOME by hand.
+    const withCfg = run('CLAUDE_CONFIG_DIR=' + fwd(path.join(tmp, 'cfg')) + '; ' + ORQ_IDIOM + same('$ORQ', '$CLAUDE_CONFIG_DIR/skills/orq'));
+    assert('  RUN: by hand, `CLAUDE_CONFIG_DIR` set -> `$CLAUDE_CONFIG_DIR/skills/orq`',
+      withCfg.code === 0 && withCfg.out === 'SAME', withCfg.out.slice(0, 200));
+    // Splittasks: (d) `<SKILL_DIR>` filled with the plugin's skill folder -> that folder; (e) left unfilled -> the manual path.
+    const splitIdiom = (dir) => `SKILL_DIR="${dir}"\n${SPLIT_IDIOM[1]}`;
+    const filled = run(splitIdiom(fwd(path.join(plugin, 'skills', 'splittasks-windows'))) + '\necho "$SKILL_DIR"');
+    assert('  RUN: `<SKILL_DIR>` filled with the plugin\'s skill folder -> the helper is taken from there',
+      filled.code === 0 && filled.out === fwd(path.join(plugin, 'skills', 'splittasks-windows')), filled.out.slice(0, 200));
+    const unfilled = run(splitIdiom('<SKILL_DIR>') + same('$SKILL_DIR', '$HOME/.claude/skills/splittasks'));
+    assert('  RUN: `<SKILL_DIR>` left unfilled -> falls back to $HOME/.claude/skills/splittasks (the manual install keeps working)',
+      unfilled.code === 0 && unfilled.out === 'SAME', unfilled.out.slice(0, 200));
+    // NEGATIVE CONTROL of `same` itself: two different paths say DIFFERENT.
+    const diff = run('X=/a; Y=/b' + same('$X', '$Y'));
+    assert('  NEGATIVE CONTROL: the in-bash comparison knows how to say DIFFERENT', diff.code === 0 && diff.out.startsWith('DIFFERENT'), diff.out);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 // Tells "the file does not exist" apart from "the file exists but is garbage".
@@ -1594,7 +1809,11 @@ console.log('\nT43. THE SPECS INDEX (specs --index)');
   // the evidence cannot be pushed to the repo on that path (the one that remains, «you do not
   // close with the evidence unpushed», belongs to the «to the repo» route and is kept).
   const PHRASES_LOCAL_ONLY = ['--local-only', 'evidence local only because', 'go on to step 6 with no commit'];
-  const stepLocalOnly = (t) => {
+  // Since 1.2.0 the command quotes the path (`node "$ORQ/scripts/evidence.js" --where`): the
+  // closing quote is dropped before looking, so the phrase stays `scripts/evidence.js --where`.
+  const unquote = (t) => t.replace(/\.js" /g, '.js ');
+  const stepLocalOnly = (raw) => {
+    const t = unquote(raw);
     const iD = t.indexOf('scripts/evidence.js --where');
     const k = t.indexOf('close --program');
     const iToRepo = t.indexOf('With 0 ("to the repo")');
@@ -1605,8 +1824,8 @@ console.log('\nT43. THE SPECS INDEX (specs --index)');
   assert('T55: /orq-batch-closed opens step 5 bis with `evidence.js --where`, with 3 uses `--local-only`, says so in one line and goes on to step 6 with no commit or push, before the `close --program`',
     stepLocalOnly(batch50));
   assert('  MUTANT T55: if `--where` is not the first thing the step calls (the normal copy goes first), the assertion FAILS',
-    batch50.includes('scripts/evidence.js --where') &&
-    !stepLocalOnly(batch50.replace('scripts/evidence.js --where', 'scripts/evidence.js --lane T1 --wherever')));
+    unquote(batch50).includes('scripts/evidence.js --where') &&
+    !stepLocalOnly(unquote(batch50).replace('scripts/evidence.js --where', 'scripts/evidence.js --lane T1 --wherever')));
   for (const f of PHRASES_LOCAL_ONLY) {
     assert(`  MUTANT T55: without «${f}», the assertion FAILS`,
       batch50.includes(f) && !stepLocalOnly(batch50.split(f).join('')));

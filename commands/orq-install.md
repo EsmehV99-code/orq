@@ -7,6 +7,8 @@ Its owner asked to install (or check) the `orq` skill. Do EXACTLY this, without 
 
 `<skill>` is the skill's folder: `~/.claude/skills/orq`, or `$CLAUDE_CONFIG_DIR/skills/orq` if that variable is set. On macOS `~` is `/Users/<you>`; on Windows write the full path with `/` slashes and between quotes.
 
+If orq was installed as a **plugin** (`/plugin install orq --marketplace EsmehV99-code/orq`), there is nothing to install: the 12 hooks travel inside the plugin and never go into `settings.json`. Tell the owner that, and that `install.js --check` would list the 12 plugs as MISSING there, which is expected. Do not run the installer in that case: it would wire a second copy of every hook.
+
 1. Run:
 
 ```

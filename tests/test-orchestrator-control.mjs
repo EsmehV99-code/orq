@@ -37,7 +37,14 @@ let ok = 0, bad = 0;
 // starts as a copy of the real `settings.json`, so that what the hook reads is the
 // same as what it would read in production; whatever it WRITES stays here. If the
 // real one cannot be read, an empty object: the suite does not depend on it.
-const TOY_SETTINGS = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-settings-'));
+// EVERY temp root is CANONICAL (`realpathSync.native`): on the macOS runner
+// `$TMPDIR` is a link (`/var/folders` → `/private/var/folders`) and on the Windows
+// runner it is an 8.3 short name (`C:\Users\RUNNER~1\...`). The hook sees the real
+// form (through `process.cwd()`, `git` and `realpathSync.native`); if the suite
+// kept the textual one, a path it builds and the same path the hook prints or
+// stores would never be equal, and the assertions would fail for no bug.
+const tmpRoot = (prefix) => fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
+const TOY_SETTINGS = tmpRoot('orch-settings-');
 {
   let copy = '{}\n';
   try { copy = fs.readFileSync(path.join(os.homedir(), '.claude', 'settings.json'), 'utf8'); } catch { copy = '{}\n'; }
@@ -116,7 +123,7 @@ function hardClearState(repo) {
 
 /* ---------------------------------------------------------------- the scenario */
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-test-'));
+const root = tmpRoot('orch-test-');
 // It does NOT exist ON PURPOSE: it is "this machine has no skill config".
 const NO_CONFIG = path.join(root, 'there-is-no-orchestrator-config.json');
 // And the toy one, with the two heights the owner signed on 09-15.
@@ -597,6 +604,21 @@ assert('loading THE skill starts it by itself', /RUNNING/.test(autoStart.stdout)
 assert('...and the owner session is recorded', readState(repo).owner_session === 'owner-session');
 assert('...with its program', /^orch-/.test(readState(repo).program_id || ''));
 assert('loading it again does not bother you a second time', loadSkill('orq', 'owner-session').stdout === '');
+{
+  // PLUGIN SPELLING (1.2.0): installed as a plugin, Claude Code namespaces the skill as
+  // `orq:orq`; the load through the `Skill` tool has to start it just the same. Only that
+  // exact spelling: `orq:other` is another skill.
+  hardClearState(repo);
+  loadSkill('orq:other', 'owner-session');
+  assert('loading `orq:other` (a plugin skill that is not ours) activates nothing',
+    !fs.existsSync(path.join(repo, '.git', 'orchestrator-state.json')));
+  const pluginStart = loadSkill('orq:orq', 'owner-session');
+  assert('loading THE skill as `orq:orq` (the plugin spelling) starts it by itself, with the owner recorded',
+    /RUNNING/.test(pluginStart.stdout) && readState(repo).owner_session === 'owner-session' && /^orch-/.test(readState(repo).program_id || ''),
+    pluginStart.stdout.slice(0, 160));
+  hardClearState(repo);
+  loadSkill('orq', 'owner-session');   // the scenario below continues on the plain load
+}
 
 fire(agentEvent('a lane that takes a while'));
 const wait = readState(repo).waits.find((e) => /a lane that takes a while/.test(e.what));
@@ -637,7 +659,7 @@ assert('...until the skill is loaded again',
 // it really rejects what it must reject, and that it accepts what is right.
 console.log('\n12. VALIDATE — the receipt against its brief');
 
-const fixturesFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-validate-'));
+const fixturesFolder = tmpRoot('orch-validate-');
 const briefPath = path.join(fixturesFolder, 'brief.md');
 fs.writeFileSync(briefPath, [
   '# T9 — validate test',
@@ -774,7 +796,7 @@ assert('"## state" in lowercase does NOT count as the heading "## STATE" (it use
 // to a good receipt before this control, otherwise the test measures the previous
 // one's broken fixture, not what it claims to check.
 fs.writeFileSync(validatePath, goodSections([`- ${ITEM1}`, `- ${ITEM2}`], HEALTHY_DIFF, '- none: met'));
-const folderWithNoRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-validate-no-repo-'));
+const folderWithNoRepo = tmpRoot('orch-validate-no-repo-');
 const noProgram = cli(['validate', '--lane', 'T9', '--receipt', validatePath, '--brief', briefPath], folderWithNoRepo);
 assert('validate works WITHOUT an active orchestration program (it is not even a git repo)',
   noProgram.status === 0 && /^OK/.test(noProgram.stdout));
@@ -4618,7 +4640,7 @@ console.log('\n35. THE RECEIPT\'S "— proof:" MARKER (point 14)');
 //   proofMarkerRe (the marker line)  scripts/orchestrator-control.js:11558-11562
 //   rejection message "COMMAND BETWEEN BACKTICKS"  scripts/orchestrator-control.js:13486-13487
 
-const folder35 = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-b35-'));
+const folder35 = tmpRoot('orch-b35-');
 const briefPath35 = path.join(folder35, 'brief.md');
 fs.writeFileSync(briefPath35, [
   '# T9 — marker test', '',
@@ -6994,6 +7016,67 @@ clearState(repo); setOwner(OWNER);
     rState.status === 0 && /skill commands:/.test(rState.stdout) &&
     /dashboard\.md\s+FOREIGN \(no mark\): not touched/.test(rState.stdout),
     rState.stdout.slice(0, 900));
+
+  // AS A PLUGIN (1.2.0; Codex gpt-5.6-sol r10, MEDIUM) the commands are NOT copied: Claude
+  // Code serves them itself as `/orq:<name>` with `${CLAUDE_PLUGIN_ROOT}` filled in, and a
+  // copy in `~/.claude/commands/` would point at the manual path and outlive the uninstall.
+  // The hook knows it runs as the plugin because the hook process carries
+  // `CLAUDE_PLUGIN_ROOT` (documented: exported to hook commands) and it is ITS OWN root.
+  // The agents ARE still copied (`lane-lead` is named bare in every brief).
+  {
+    const { dir: dPlug, script: sPlug } = buildSkill50('plugin');
+    const cfgPlug = fs.mkdtempSync(path.join(root, 't10-plugin-'));
+    hardClearState(repo);
+    const cp = fire({
+      hook_event_name: 'PreToolUse', tool_name: 'Skill', cwd: repo, session_id: 'du50-plugin',
+      tool_input: { skill: 'orq:orq' },
+    }, sPlug, { CLAUDE_CONFIG_DIR: cfgPlug, ORCH_CONFIG: TOY_CONFIG, CLAUDE_PLUGIN_ROOT: dPlug });
+    assert('(11-plugin) loaded as the plugin (CLAUDE_PLUGIN_ROOT = its own root): `commands/` is NOT copied to <CLAUDE_CONFIG_DIR>/commands/',
+      /RUNNING/.test(cp.stdout) && !fs.existsSync(path.join(cfgPlug, 'commands')), cp.stdout.slice(0, 300));
+    assert('  ...the 3 agents ARE copied all the same',
+      fs.existsSync(path.join(cfgPlug, 'agents', 'lane-lead.md')) && /Skill agents active: 3/.test(cp.stdout), cp.stdout.slice(0, 300));
+    assert('  ...and the startup line says the commands are served by the plugin, not copied',
+      /skill commands: served by the plugin as \/orq:<name>, not copied\./.test(cp.stdout) && !/skill commands: 5/.test(cp.stdout), cp.stdout.slice(0, 600));
+    const stPlug = cli(['agents', '--state'], repo, { CLAUDE_CONFIG_DIR: cfgPlug, CLAUDE_PLUGIN_ROOT: dPlug }, sPlug);
+    assert('  ...and `agents --state` (with the hook\'s env) says so too instead of listing 5 missing commands',
+      stPlug.status === 0 && /served by the plugin/.test(stPlug.stdout) && !/dashboard\.md/.test(stPlug.stdout), stPlug.stdout.slice(0, 600));
+    // From the Bash tool there is NO `CLAUDE_PLUGIN_ROOT` in the env (docs), so the owner passes
+    // `--plugin-root`; it only counts when it is OUR root (Codex r11, MEDIUM).
+    const stFlag = cli(['agents', '--state', '--plugin-root', dPlug], repo, { CLAUDE_CONFIG_DIR: cfgPlug, CLAUDE_PLUGIN_ROOT: '' }, sPlug);
+    assert('  ...and `agents --state --plugin-root <our root>` with NO env variable says the same',
+      stFlag.status === 0 && /served by the plugin/.test(stFlag.stdout) && !/dashboard\.md/.test(stFlag.stdout), stFlag.stdout.slice(0, 600));
+    const stNoFlag = cli(['agents', '--state'], repo, { CLAUDE_CONFIG_DIR: cfgPlug, CLAUDE_PLUGIN_ROOT: '' }, sPlug);
+    assert('  CONTROL: `agents --state` with neither env nor flag reads as the manual install (lists the commands as missing; exit 0, missing is not an error there)',
+      stNoFlag.status === 0 && /dashboard\.md\s+NOT installed/.test(stNoFlag.stdout) && !/served by the plugin/.test(stNoFlag.stdout), `${stNoFlag.status} ${stNoFlag.stdout.slice(0, 300)}`);
+    const stWrong = cli(['agents', '--state', '--plugin-root', path.join(root, 'not-our-root')], repo, { CLAUDE_CONFIG_DIR: cfgPlug, CLAUDE_PLUGIN_ROOT: '' }, sPlug);
+    assert('  CONTROL: `--plugin-root` pointing at ANOTHER folder is ignored (manual reading)',
+      /dashboard\.md/.test(stWrong.stdout) && !/served by the plugin/.test(stWrong.stdout), stWrong.stdout.slice(0, 300));
+    // CONTROL: the variable pointing at ANOTHER plugin's root is not "running as the plugin":
+    // a manual clone keeps copying its commands.
+    const cfgOther = fs.mkdtempSync(path.join(root, 't10-plugin-other-'));
+    const otherRoot = fs.mkdtempSync(path.join(root, 'some-other-plugin-'));
+    hardClearState(repo);
+    const co = fire({
+      hook_event_name: 'PreToolUse', tool_name: 'Skill', cwd: repo, session_id: 'du50-plugin-other',
+      tool_input: { skill: 'orq' },
+    }, sPlug, { CLAUDE_CONFIG_DIR: cfgOther, ORCH_CONFIG: TOY_CONFIG, CLAUDE_PLUGIN_ROOT: otherRoot });
+    assert('  CONTROL: with CLAUDE_PLUGIN_ROOT pointing at ANOTHER root (a manual clone in a session with some other plugin), the commands ARE copied',
+      fs.existsSync(path.join(cfgOther, 'commands', 'dashboard.md')) && /skill commands: 5/.test(co.stdout), co.stdout.slice(0, 300));
+    // MUTANT: without the filter, the plugin copies the commands (the orphan files of r10 come back).
+    // (anchored on the CURRENT line: `partsToSync(asPlugin = runningAsPlugin())` since the
+    // `--plugin-root` flag of `agents`; Codex r12 caught the stale anchor.)
+    const PATCH_PLUG = "  return asPlugin ? SKILL_PARTS.filter((part) => part.sub !== 'commands') : SKILL_PARTS;";
+    assert('  preparation of the mutant (11-plugin): the filter exists exactly like that', source.includes(PATCH_PLUG));
+    const { dir: dMut, script: sMut } = buildSkill50('plugin-mutant', source.replace(PATCH_PLUG, '  return SKILL_PARTS; /* mutated: copies as if by hand */'));
+    const cfgMut = fs.mkdtempSync(path.join(root, 't10-plugin-mut-'));
+    hardClearState(repo);
+    fire({
+      hook_event_name: 'PreToolUse', tool_name: 'Skill', cwd: repo, session_id: 'du50-plugin-mut',
+      tool_input: { skill: 'orq' },
+    }, sMut, { CLAUDE_CONFIG_DIR: cfgMut, ORCH_CONFIG: TOY_CONFIG, CLAUDE_PLUGIN_ROOT: dMut });
+    assert('  MUTANT (11-plugin) without the filter: the plugin DOES copy the commands (that is why the filter is needed)',
+      fs.existsSync(path.join(cfgMut, 'commands', 'dashboard.md')));
+  }
 
   // MUTANT: without the "do not overwrite what is somebody else's" guard, the owner's
   // command gets overwritten.
@@ -9927,11 +10010,14 @@ console.log('\n60. THE SKILL IS CALLED `orq` (T10)');
   // MUTANT: the NEW alias is removed and `orq` stops starting. It is the failure of
   // 09-21 the other way round: the one left unrecognized is the good name.
   {
-    const P60 = '  return name === SKILL_NAME || name === OLD_SKILL_NAME;';
-    assert('preparation of the MUTANT (60a): the recognition of the two names exists as is',
+    // Since 1.2.0 the line carries a THIRD name, the plugin spelling `orq:orq`; the mutant takes
+    // out ONLY the bare `orq` and keeps the other two (Codex r11: the old anchor no longer
+    // matched, so the mutant was a no-op and the preparation assertion failed).
+    const P60 = "  return name === SKILL_NAME || name === OLD_SKILL_NAME || name === SKILL_NAME + ':' + SKILL_NAME;";
+    assert('preparation of the MUTANT (60a): the recognition of the three names (bare, old, plugin) exists as is',
       source.includes(P60));
     const { script: m60 } = buildSkill50('no-orq-alias',
-      source.replace(P60, '  return name === OLD_SKILL_NAME;   // MUTANT T10: without the new name'));
+      source.replace(P60, "  return name === OLD_SKILL_NAME || name === SKILL_NAME + ':' + SKILL_NAME;   // MUTANT T10: without the bare name"));
     hardClearState(repo);
     const rMut = fire({
       hook_event_name: 'PreToolUse', tool_name: 'Skill', cwd: repo,
@@ -10869,6 +10955,10 @@ console.log('\n61. T8 — `review`: three layers, bounded by HUNKS and a close b
     // and the only thing that disappears is the HEADER unit — which is
     // precisely the case being tested, and not "the whole file went away".
     git(['update-index', '--chmod=+x', 'script-t8.sh'], repoT8);
+    // AND on disk: where the disk keeps modes (macOS, Linux; `core.filemode=true`)
+    // `git diff HEAD` reports the WORKING file's mode, and the index alone showed
+    // no header. On Windows the `chmod` does nothing and the index rules.
+    fs.chmodSync(exec, 0o755);
     fs.writeFileSync(exec, '#!/bin/sh\necho goodbye\n');
     writeA(v1);
     const dBroad = git(['diff', 'HEAD'], repoT8);
@@ -10879,6 +10969,7 @@ console.log('\n61. T8 — `review`: three layers, bounded by HUNKS and a close b
     // The "fix": the mode is UNDONE (the header disappears) but the content
     // hunk is still there, changed. The file does NOT leave the diff.
     git(['update-index', '--chmod=-x', 'script-t8.sh'], repoT8);
+    fs.chmodSync(exec, 0o644);   // and on disk, for the same reason as above
     fs.writeFileSync(exec, '#!/bin/sh\necho see you later\n');
     writeA(v2);
     const r10g = cliT8(['review', '--lane', lane, '--model', 'gpt-6-astra'], { STUB_VERDICT: TWO_FINDINGS });
@@ -10907,10 +10998,12 @@ console.log('\n61. T8 — `review`: three layers, bounded by HUNKS and a close b
     git(['add', '-A'], repoT8);
     git(['commit', '-qm', 'script for the mutant'], repoT8);
     git(['update-index', '--chmod=+x', 'script-mut-t8.sh'], repoT8);
+    fs.chmodSync(exec, 0o755);   // on disk too, as in the healthy scenario (core.filemode=true on macOS/Linux)
     fs.writeFileSync(exec, '#!/bin/sh\necho goodbye\n');
     writeA(v1);
     cliT8(['review', '--lane', lane, '--model', 'gpt-6-astra'], { STUB_VERDICT: TWO_FINDINGS }, m);
     git(['update-index', '--chmod=-x', 'script-mut-t8.sh'], repoT8);
+    fs.chmodSync(exec, 0o644);
     fs.writeFileSync(exec, '#!/bin/sh\necho see you later\n');
     writeA(v2);
     const pM = path.join(root, 'p-t8-mut-hdrrev.txt');
@@ -12459,6 +12552,20 @@ clearState(repo); setOwner(SES_T5);
   pressKey('/orq-git-permitx --revoke');
   assert('  ...and `/orq-git-permitx` does NOT count as the command',
     (readL5().human_orders || []).length === 0);
+  // PLUGIN SPELLING (1.2.0): installed as a plugin, Claude Code names the command
+  // `/orq:orq-git-permit`; it is the same key, recorded under the bare name.
+  pressKey('/orq:orq-git-permit');
+  assert('  ...and `/orq:orq-git-permit` (the plugin spelling) DOES count, recorded as `/orq-git-permit`',
+    (readL5().human_orders || []).length === 1 && readL5().human_orders[0].command === '/orq-git-permit',
+    JSON.stringify(readL5().human_orders || []).slice(0, 200));
+  pressKey('/orq:orq-git-permitx');
+  assert('  ...while `/orq:orq-git-permitx` does NOT (the prefix strips nothing else)',
+    (readL5().human_orders || []).length === 1);
+  // MALFORMED PREFIXES (Codex r10, LOW): a bare `/orq:` strips to `/`, and `/orq: orq-git-permit`
+  // (a space after the colon) strips to `/ orq-git-permit`; neither is the command.
+  for (const p of ['/orq:', '/orq: orq-git-permit', '/orq:/orq-git-permit']) pressKey(p);
+  assert('  ...nor do `/orq:`, `/orq: orq-git-permit` or `/orq:/orq-git-permit` (malformed prefixes)',
+    (readL5().human_orders || []).length === 1, JSON.stringify(readL5().human_orders || []).slice(0, 200));
 }
 
 /* --- T5.2 the two groups are independent --- */
@@ -16881,6 +16988,29 @@ console.log('\nT54. THE OWNER\'S HANDOFF WITHIN THE SAME PROGRAM (issue #17)');
     assert('T54 (g) typed `/orq` with no program STARTS one, with B as owner and the «Orchestration RUNNING» greeting as `UserPromptSubmit`',
       Ln && Ln.owner_session === B54 && /^orch-/.test(Ln.program_id || '') && /RUNNING/.test(fresh.out) && evOf(fresh) === 'UserPromptSubmit',
       `${JSON.stringify(Ln && { d: Ln.owner_session, p: Ln.program_id })} ${fresh.out.slice(0, 200)}`);
+    // PLUGIN SPELLING (1.2.0): installed as a plugin the skill is `/orq:orq`; typed, it is the
+    // SAME load. `/orq:orq-git-permit` keeps being a command, not the load.
+    hardClearState(repo54);
+    const freshPlugin = typeOrq54(B54, '/orq:orq');
+    let Lp = null; try { Lp = read54(); } catch { Lp = null; }
+    assert('T54 (g) typed `/orq:orq` (the plugin spelling) with no program ALSO STARTS one, with B as owner',
+      Lp && Lp.owner_session === B54 && /^orch-/.test(Lp.program_id || '') && /RUNNING/.test(freshPlugin.out),
+      `${JSON.stringify(Lp && { d: Lp.owner_session, p: Lp.program_id })} ${freshPlugin.out.slice(0, 200)}`);
+    hardClearState(repo54);
+    const notLoad = typeOrq54(B54, '/orq:orq-git-permit');
+    let Lq = null; try { Lq = read54(); } catch { Lq = null; }
+    assert('T54 (g) CONTROL: typed `/orq:orq-git-permit` is NOT the load',
+      !/RUNNING/.test(notLoad.out) && (Lq === null || Lq.owner_session !== B54), notLoad.out.slice(0, 120));
+    // MALFORMED PREFIXES (Codex r10, LOW): `/orq:` strips to `/`, `/orq: orq` to `/ orq`: not the load.
+    const malformed = ['/orq:', '/orq: orq', '/orq:orqx'].map((p) => {
+      hardClearState(repo54);
+      const r = typeOrq54(B54, p);
+      let L = null; try { L = read54(); } catch { L = null; }
+      return { p, out: r.out, started: L !== null && L.owner_session === B54 };
+    });
+    assert('T54 (g) CONTROL: typed `/orq:`, `/orq: orq` and `/orq:orqx` (malformed prefixes) are NOT the load',
+      malformed.every((m) => !m.started && !/RUNNING/.test(m.out)),
+      malformed.map((m) => `${m.p}: ${m.started} ${m.out.slice(0, 40)}`).join(' | '));
   }
 
   /* ---- `status` with no `owner_since` does not invent the time (Codex Sol r2, LOW) ---- */
