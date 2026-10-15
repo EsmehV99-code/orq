@@ -5,18 +5,33 @@
 ![Platforms: Windows | macOS](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-lightgrey)
 ![Needs: Node.js](https://img.shields.io/badge/needs-Node.js-green)
 
-![Demo, recorded from the hook's real output: a receipt that claims "done" with no proof is rejected unread; the same receipt with its proofs passes](docs/demo.gif)
+![Demo, recorded from the hook's real output: a receipt that claims "done" with no proof is rejected by validate before the orchestrator reads it; the same receipt with its proofs passes](docs/demo.gif)
 
 A [Claude Code](https://claude.com/claude-code) skill that turns one terminal into an
 **orchestrator**: it splits a job into lanes, hands each lane to another terminal or subagent with
 a complete brief, and **checks every claim that comes back before letting it in**. The orchestrator
 never builds. It works for any task, not just software.
 
+**Before / after, in three lines.** Before: three terminals say "done", the orchestrator believes them,
+and the "done" that wasn't travels to `main`. After: each lane hands back a receipt with a proof next to
+each claim, `validate` sends it back if a proof is missing (the rule: it runs before the orchestrator
+reads the prose), a hook warns on the classic failures,
+and only the orchestrator merges, with the owner's recorded permit.
+
 **Why:** with 3+ agents in parallel, the orchestrator is the node with the most inputs and the
 least contact with the truth. If it only routes messages, it amplifies every "done" that wasn't.
 `orq` makes each lane prove its claims (a receipt with evidence), and a hook watches for the classic
 failures: an unverified "0 results", a wait with no deadline, a merge without permission, an
 orchestrator that starts editing code itself.
+
+**Measured, not claimed** ([`docs/MEASURED.md`](docs/MEASURED.md), every number with its source): the
+hook costs an ordinary session, in a repo with no orchestration, **a median of 122–155 ms per event**
+(p90 247–522 ms; starting `node` alone: 84 ms median) and injects nothing; in one real program it turned
+**8,619 events into 230 warnings** (54 unchecked zeros, 20 missing receipts, 2 attempts of the
+orchestrator to edit code…); `validate` rejected 3 briefs before dispatch and sent back 2 lanes'
+receipts; the skill was built with itself (204 commits, 57 merges, every one a lane). What is **not**
+proven: that it is cheaper. The one **uncontrolled** pair of runs with/without the reading gate differed,
+per launched lane, by −70 % in the orchestrator's context and by **−4 % in total tokens**.
 
 ![The orq circuit: the owner invokes the skill; the orchestrator hands briefs to the lanes and verifies the receipts that come back; the hook warns it and watches every lane; only the orchestrator, with permission, merges to the main branch](docs/cover.svg)
 
@@ -34,8 +49,8 @@ same thing without the `orq:` prefix. One or the other, not both — [Installati
 
 - **What it does:** starts on its own when loaded (`/orq`: that is the name of the skill, not a
   shortcut to another one), keeps its state on disk, watches memory and waits, brakes the
-  orchestrator if it tries to edit code, and validates briefs and receipts before anyone reads
-  their prose.
+  orchestrator if it tries to edit code, and validates briefs and receipts mechanically (the rule
+  is to run `validate` before reading their prose).
 - **What it does NOT do:** it does not build, it does not integrate, it does not close terminals.
 
 ## Start here
@@ -101,6 +116,11 @@ ends…). It **warns, it does not block**; the only exception is the `orchestrat
 does cut when the orchestrator tries to edit code ([`references/control-phase-1-and-2.md`](references/control-phase-1-and-2.md)).
 The **pulse** is an automatic look every 5 minutes (a `Monitor` that runs `pulse`) so that nothing —
 a ready PR, an expired wait — sits there without anyone seeing it.
+**Smaller context windows:** the two heights in `orchestrator.config.json` (`warn_tokens` 500,000,
+`airbag_tokens` 600,000) are absolute token counts, and the `%` the board shows is over a 1,000,000-token
+window, hard-wired today. With a 200k model the warnings never arrive before Claude Code's own
+compaction: set the heights to fit (e.g. 100,000 / 120,000) and they fire where they should, but the `%`
+column keeps reading over the million (known limit, on the list for 1.2.1).
 
 **The closed batch.** When the owner considers the work finished, they type `/orq-batch-closed`: an
 8-step script that stops if any lane did not bring a receipt, removes the worktrees that are already
@@ -110,23 +130,14 @@ nothing that is not merged.
 ## What is in each folder
 
 ```
-SKILL.md                         the core: role, laws, when to open each reference
-orchestrator.config.json         memory heights (warning 500k, airbag 600k) and brakes
-scripts/orchestrator-control.js  the program: Claude Code hook + subcommands (start, pulse, validate, review…)
-scripts/install.js               the installer: puts the 12 hooks into settings.json; --check looks without touching
-scripts/dashboard.js             the dashboard (a snapshot of the orchestration)
-scripts/evidence.js              copies each lane's evidence into the repository
-install/                         hooks-orchestrator.example.json: the 12 hooks, as a reference
-references/                      brief and receipt templates, dispatch, laws, mini-orchestrator, resume and close, recon
-agents/                          the three agents (lane-lead, disposable-reader, receipt-verifier);
-                                 the skill copies them to ~/.claude/agents/ on load
-commands/                        the commands the owner types (/dashboard, /orq-git-permit, /orq-merge-permit,
-                                 /orq-batch-closed, /orq-install); the skill copies them to ~/.claude/commands/ on load
-skills/                          the bundled /splittasks skill, one variant per system (splittasks-windows/,
-                                 splittasks-macos/); the installer copies the right one to ~/.claude/skills/splittasks/
-docs/                            the circuit (Mermaid + interactive HTML), the clickable map (map.html),
-                                 and the cover drawing (cover.svg)
-tests/                           suites: structure, hook, adversarial, dashboard, evidence and install; toy fixtures
+SKILL.md · orchestrator.config.json   the core (role, laws, when to open each reference) · heights (500k / 600k) and brakes
+scripts/                              orchestrator-control.js (hook + subcommands), install.js (--check looks only),
+                                      dashboard.js, evidence.js
+install/ · references/                the 12 hooks as a reference · brief/receipt templates, dispatch, laws, mini-orchestrator, recon
+agents/ · commands/                   lane-lead, disposable-reader, receipt-verifier · /dashboard, /orq-git-permit,
+                                      /orq-merge-permit, /orq-batch-closed, /orq-install (copied to ~/.claude/ on load)
+skills/                               the bundled /splittasks skill (splittasks-windows/, splittasks-macos/)
+docs/ · tests/                        circuit, clickable map (map.html), cover, MEASURED.md, demo.gif · the 6 suites + fixtures
 ```
 
 ## Commands
@@ -288,26 +299,16 @@ after `claude plugin uninstall orq@orq`, stay until the owner (or the orchestrat
 
 ## Platforms
 
-- **Windows** — built and tested here (the full test suite runs green).
-- **macOS** — supported in the code, simulated in the tests, but **NOT TESTED ON macOS** on a real
-  machine: case-insensitive paths, listing processes with `/bin/ps`, opening a page with
-  `/usr/bin/open`, opening a named terminal with `osascript`, and a symlinked `settings.json`. If
-  something fails on a Mac, that is the first place to look — an issue with the output is very welcome.
+- **Windows** — built and used here daily; the 6 suites run green locally and in CI.
+- **macOS** — the 6 suites run green in CI (`macos-latest`), but **NOT TESTED ON macOS** by a person on
+  a real Mac: `/bin/ps`, `/usr/bin/open`, `osascript`, a symlinked `settings.json`. An issue with the output is welcome.
 - **Linux** — not a target; most of it is plain Node and may work, untested.
 
 ## Testing
 
-```
-node tests/test-structure.mjs
-node tests/test-orchestrator-control.mjs
-node tests/test-orchestrator-control-adversarial.mjs
-node tests/test-dashboard.mjs
-node tests/test-evidence.mjs
-node tests/test-install.mjs
-```
-
-By default each suite tests the script next to it (`../scripts/orchestrator-control.js`). To test
-another copy, set `ORQ_HOOK` to the path of THAT copy's `scripts/orchestrator-control.js`.
+`node tests/<suite>.mjs` for each of `test-structure`, `test-orchestrator-control`,
+`test-orchestrator-control-adversarial`, `test-dashboard`, `test-evidence`, `test-install`. Each suite
+tests the script next to it; `ORQ_HOOK` points it at another copy's `scripts/orchestrator-control.js`.
 
 ## Evidence
 
